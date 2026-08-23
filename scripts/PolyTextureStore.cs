@@ -157,6 +157,10 @@ public static class PolyTextureStore
         {
             AppendSweep(builder, sweep, indent, suffix);
         }
+        else if (element is CrackLineElement crackLine)
+        {
+            AppendCenterStroke(builder, crackLine, includeBezierData: true, indent, suffix);
+        }
         else if (element is CenterPathElement centerPath)
         {
             AppendCenterStroke(builder, centerPath, includeBezierData: true, indent, suffix);
@@ -407,7 +411,12 @@ public static class PolyTextureStore
 
         if (type.Equals(CenterPathElement.ElementType, System.StringComparison.Ordinal))
         {
-            return ReadCenterStroke(element, supportsBezierHandles: true);
+            return ReadCenterStroke(element, CenterPathElement.ElementType);
+        }
+
+        if (type.Equals(CrackLineElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadCenterStroke(element, CrackLineElement.ElementType);
         }
 
         if (type.Equals(SweepGeneratorElement.ElementType, System.StringComparison.Ordinal))
@@ -551,7 +560,21 @@ public static class PolyTextureStore
 
     private static CenterStrokeElement ReadCenterStroke(Godot.Collections.Dictionary centerStroke, bool supportsBezierHandles)
     {
-        CenterStrokeElement element = supportsBezierHandles ? new CenterPathElement
+        return ReadCenterStroke(centerStroke, supportsBezierHandles ? CenterPathElement.ElementType : CenterStrokeElement.ElementType);
+    }
+
+    private static CenterStrokeElement ReadCenterStroke(Godot.Collections.Dictionary centerStroke, string elementType)
+    {
+        bool supportsBezierHandles = !elementType.Equals(CenterStrokeElement.ElementType, System.StringComparison.Ordinal);
+        CenterStrokeElement element = elementType.Equals(CrackLineElement.ElementType, System.StringComparison.Ordinal) ? new CrackLineElement
+        {
+            Id = ReadString(centerStroke, "id", "crack_line"),
+            Name = ReadString(centerStroke, "name", ReadString(centerStroke, "id", "Crack Line")),
+            Enabled = centerStroke["enabled"].AsBool(),
+            Opacity = centerStroke["opacity"].AsSingle(),
+            Symmetry = centerStroke["symmetry"].AsBool(),
+            Falloff = centerStroke["falloff"].AsSingle()
+        } : supportsBezierHandles ? new CenterPathElement
         {
             Id = ReadString(centerStroke, "id", "center_stroke"),
             Name = ReadString(centerStroke, "name", ReadString(centerStroke, "id", "Center Path")),

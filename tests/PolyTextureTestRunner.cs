@@ -14,6 +14,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
+        Run("crack lines remain semantic editable paths", TestCrackLineRoundTrip);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
         Run("evaluator keeps operations live", TestLiveEvaluation);
@@ -184,6 +185,52 @@ public partial class PolyTextureTestRunner : SceneTree
         List<CenterStrokeElement> instances = PolyTextureRenderer.BuildSweepInstances(document.Textures[0], evaluation.LiveSweeps[0]);
         Equal(9, instances.Count, "live parameter update");
         Assert(document.Textures[0].Elements.Count == 3, "evaluation must not append editable copies");
+    }
+
+    private static void TestCrackLineRoundTrip()
+    {
+        PolyTextureDocument document = new()
+        {
+            ActiveTextureId = "cracks",
+            ActiveElementId = "main_crack",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "cracks", Name = "Cracks" };
+        CrackLineElement crack = new()
+        {
+            Id = "main_crack",
+            Name = "Main Crack",
+            Falloff = 1.5f
+        };
+        crack.Points.Add(new CenterStrokePoint
+        {
+            X = 20.0f,
+            Y = 30.0f,
+            LeftWidth = 5.0f,
+            RightWidth = 5.0f,
+            HandleMode = PolyTextureHandleMode.Aligned
+        });
+        crack.Points.Add(new CenterStrokePoint
+        {
+            X = 80.0f,
+            Y = 110.0f,
+            LeftWidth = 2.0f,
+            RightWidth = 2.0f,
+            HandleMode = PolyTextureHandleMode.Aligned
+        });
+        texture.Elements.Add(crack);
+        document.Textures.Add(texture);
+
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+        string path = "user://polytexture_test_crack_line.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        CrackLineElement loadedCrack = loaded.Textures[0].GetElement("main_crack") as CrackLineElement;
+        Assert(loadedCrack != null, "semantic crack line missing after round trip");
+        Equal(CrackLineElement.ElementType, loadedCrack.Type, "crack line type");
+        Assert(loadedCrack.SupportsBezierHandles, "crack line must keep Bezier editing");
+        Near(1.5f, loadedCrack.Falloff, 0.0001f, "crack falloff");
+        Equal(2, loadedCrack.Points.Count, "crack point count");
     }
 
     private static void TestRepeatGrid()

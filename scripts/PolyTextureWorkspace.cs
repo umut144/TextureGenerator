@@ -34,6 +34,7 @@ public partial class PolyTextureWorkspace : Control
     private const int DrawCenterStrokeMenuId = 1;
     private const int DrawCenterPathMenuId = 2;
     private const int FinishDrawingMenuId = 3;
+    private const int DrawCrackLineMenuId = 4;
     private const int GenerateSweepMenuId = 1;
     private const int GenerateRepeatGridMenuId = 2;
     private const int OperatorMirrorMenuId = 1;
@@ -74,6 +75,7 @@ public partial class PolyTextureWorkspace : Control
     private bool _deferHistory;
     private bool _drawingCenterStroke;
     private bool _drawingCenterPath;
+    private bool _drawingCrackLine;
     private bool _refreshingElementActionBar;
     private bool _pointPlacementMode;
     private PolyTextureHandleView _handleView = PolyTextureHandleView.Width;
@@ -1246,7 +1248,7 @@ public partial class PolyTextureWorkspace : Control
         MarkChanged("Texture deleted.");
     }
 
-    private void AddCenterStroke(bool drawCenterPath)
+    private void AddCenterStroke(bool drawCenterPath, bool drawCrackLine = false)
     {
         PolyTextureItem activeTexture = _document?.ActiveTexture;
         if (activeTexture == null)
@@ -1254,9 +1256,11 @@ public partial class PolyTextureWorkspace : Control
             return;
         }
 
-        CenterStrokeElement element = drawCenterPath ? new CenterPathElement() : new CenterStrokeElement();
-        element.Id = EnsureUniqueElementId(activeTexture, drawCenterPath ? "center_path" : "center_stroke");
-        element.Name = drawCenterPath ? "Center Path" : "Center Stroke";
+        CenterStrokeElement element = drawCrackLine
+            ? new CrackLineElement()
+            : drawCenterPath ? new CenterPathElement() : new CenterStrokeElement();
+        element.Id = EnsureUniqueElementId(activeTexture, drawCrackLine ? "crack_line" : drawCenterPath ? "center_path" : "center_stroke");
+        element.Name = drawCrackLine ? "Crack Line" : drawCenterPath ? "Center Path" : "Center Stroke";
         element.Enabled = true;
         element.Opacity = 0.86f;
         element.Symmetry = true;
@@ -1267,10 +1271,10 @@ public partial class PolyTextureWorkspace : Control
         _document.SelectionKind = PolyTextureSelectionKind.Element;
         _canvasView.SelectPoint(-1);
         RefreshAll();
-        MarkChanged(drawCenterPath ? "Center path added." : "Center stroke added.");
+        MarkChanged(drawCrackLine ? "Crack line added." : drawCenterPath ? "Center path added." : "Center stroke added.");
     }
 
-    private void ToggleCenterStrokeDrawing(bool drawCenterPath)
+    private void ToggleCenterStrokeDrawing(bool drawCenterPath, bool drawCrackLine = false)
     {
         if (_drawingCenterStroke)
         {
@@ -1278,7 +1282,7 @@ public partial class PolyTextureWorkspace : Control
             return;
         }
 
-        AddCenterStroke(drawCenterPath);
+        AddCenterStroke(drawCenterPath, drawCrackLine);
         if (_document?.ActiveCenterStroke == null)
         {
             return;
@@ -1286,20 +1290,25 @@ public partial class PolyTextureWorkspace : Control
 
         _drawingCenterStroke = true;
         _drawingCenterPath = drawCenterPath;
+        _drawingCrackLine = drawCrackLine;
         _canvasView.SetDrawingMode(true);
         RefreshDrawingMenu();
-        SetStatus(drawCenterPath ? "Drawing center path. Click in the canvas to place points." : "Drawing center stroke. Click in the canvas to place points.");
+        SetStatus(drawCrackLine
+            ? "Drawing crack line. Click in the canvas to place points."
+            : drawCenterPath ? "Drawing center path. Click in the canvas to place points." : "Drawing center stroke. Click in the canvas to place points.");
     }
 
     private void FinishCenterStrokeDrawing()
     {
         bool finishedCenterPath = _drawingCenterPath;
+        bool finishedCrackLine = _drawingCrackLine;
         _drawingCenterStroke = false;
         _drawingCenterPath = false;
+        _drawingCrackLine = false;
         _canvasView?.SetDrawingMode(false);
         RefreshDrawingMenu();
 
-        SetStatus(finishedCenterPath ? "Center path drawing finished." : "Center stroke drawing finished.");
+        SetStatus(finishedCrackLine ? "Crack line drawing finished." : finishedCenterPath ? "Center path drawing finished." : "Center stroke drawing finished.");
     }
 
     private void RefreshDrawingMenu()
@@ -1319,6 +1328,7 @@ public partial class PolyTextureWorkspace : Control
 
         popup.AddItem("Center Stroke", DrawCenterStrokeMenuId);
         popup.AddItem("Center Path", DrawCenterPathMenuId);
+        popup.AddItem("Crack Line", DrawCrackLineMenuId);
     }
 
     private void OnDrawMenuPressed(long id)
@@ -1338,6 +1348,13 @@ public partial class PolyTextureWorkspace : Control
                     FinishCenterStrokeDrawing();
                 }
                 ToggleCenterStrokeDrawing(drawCenterPath: true);
+                break;
+            case DrawCrackLineMenuId:
+                if (_drawingCenterStroke)
+                {
+                    FinishCenterStrokeDrawing();
+                }
+                ToggleCenterStrokeDrawing(drawCenterPath: false, drawCrackLine: true);
                 break;
             case FinishDrawingMenuId:
                 FinishCenterStrokeDrawing();

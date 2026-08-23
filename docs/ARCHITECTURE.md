@@ -75,6 +75,11 @@ Initial port types are `PointSet`, `PathSet`, `RegionSet`, `InstanceSet`,
 data is position, physical size, rotation, and corner radius; polygon samples
 are always derived by the evaluator.
 
+`Crack Line` is a semantic `PathSet` Source. It stores an editable physical
+center path with per-point widths and Bezier handles. Its dedicated type keeps
+crack-specific generators and future reveal metadata distinct from generic
+drawn paths while reusing the same path editing interaction.
+
 `Repeat Grid` consumes preceding evaluated region geometry and produces a
 deterministic grid of translated instances. Signed alternate-row offset is a
 general parameter; a half-step offset is merely the brick-wall configuration.

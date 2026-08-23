@@ -570,9 +570,10 @@ public static class PolyTextureValidator
 
             bool isCenterStroke = type.Equals(CenterStrokeElement.ElementType, System.StringComparison.Ordinal);
             bool isCenterPath = type.Equals(CenterPathElement.ElementType, System.StringComparison.Ordinal);
-            if (isCenterStroke || isCenterPath)
+            bool isCrackLine = type.Equals(CrackLineElement.ElementType, System.StringComparison.Ordinal);
+            if (isCenterStroke || isCenterPath || isCrackLine)
             {
-                if (!ValidateCenterStrokeDictionary(element, elementPath, requireIdentity: true, supportsBezierHandles: isCenterPath, out error))
+                if (!ValidateCenterStrokeDictionary(element, elementPath, requireIdentity: true, supportsBezierHandles: isCenterPath || isCrackLine, out error))
                 {
                     return false;
                 }
