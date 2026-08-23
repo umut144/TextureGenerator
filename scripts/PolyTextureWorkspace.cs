@@ -45,6 +45,7 @@ public partial class PolyTextureWorkspace : Control
     private Tree _outlinerTree;
     private FileDialog _loadDialog;
     private FileDialog _saveAsDialog;
+    private FileDialog _outputExportDialog;
     private LineEdit _newTextureNameLineEdit;
     private LineEdit _documentNameLineEdit;
     private Label _activeDocumentLabel;
@@ -78,6 +79,7 @@ public partial class PolyTextureWorkspace : Control
     private PolyTextureGuide _guideAxisDraft;
     private MirrorCreationState _mirrorCreationState;
     private MirrorGeneratorElement _mirrorDraft;
+    private bool _exportNormalMap;
 
     public override void _Ready()
     {
@@ -311,6 +313,16 @@ public partial class PolyTextureWorkspace : Control
         _saveAsDialog.AddFilter("*.polytexture.json ; PolyTexture JSON");
         _saveAsDialog.FileSelected += SaveDocumentAsPath;
         AddChild(_saveAsDialog);
+
+        _outputExportDialog = new FileDialog
+        {
+            FileMode = FileDialog.FileModeEnum.SaveFile,
+            Access = FileDialog.AccessEnum.Filesystem,
+            Title = "Export Output PNG"
+        };
+        _outputExportDialog.AddFilter("*.png ; PNG Image");
+        _outputExportDialog.FileSelected += ExportOutputToPath;
+        AddChild(_outputExportDialog);
     }
 
     private void BuildActionBar(VBoxContainer mainLayout)
@@ -526,6 +538,10 @@ public partial class PolyTextureWorkspace : Control
             };
             _elementActionBar.AddChild(heightSpinBox);
         }
+        else if (_document.SelectionKind == PolyTextureSelectionKind.Output && _document.ActiveOutput != null)
+        {
+            BuildOutputActionBar(_document.ActiveOutput);
+        }
         else if (_document.SelectionKind == PolyTextureSelectionKind.Point
             && _document.ActivePoint is CenterStrokePoint point)
         {
@@ -673,6 +689,78 @@ public partial class PolyTextureWorkspace : Control
             AddGuideSpinBox("X2", guide.AxisEnd.X, value => guide.AxisEnd = new Vector2((float)value, guide.AxisEnd.Y));
             AddGuideSpinBox("Y2", guide.AxisEnd.Y, value => guide.AxisEnd = new Vector2(guide.AxisEnd.X, (float)value));
         }
+    }
+
+    private void BuildOutputActionBar(PolyTextureOutputBinding output)
+    {
+        _elementActionBar.AddChild(new Label { Text = $"{(output.Kind == PolyTextureOutputKind.Height ? "Height" : "Mask")}: {output.Name}" });
+        Button previewButton = new() { Text = "Preview" };
+        previewButton.Pressed += () => PreviewOutput(normalMap: false);
+        _elementActionBar.AddChild(previewButton);
+        Button exportButton = new() { Text = "Export PNG..." };
+        exportButton.Pressed += () => OpenOutputExportDialog(normalMap: false);
+        _elementActionBar.AddChild(exportButton);
+        if (output.Kind == PolyTextureOutputKind.Height)
+        {
+            Button normalPreviewButton = new() { Text = "Preview Normal" };
+            normalPreviewButton.Pressed += () => PreviewOutput(normalMap: true);
+            _elementActionBar.AddChild(normalPreviewButton);
+            Button normalExportButton = new() { Text = "Export Normal..." };
+            normalExportButton.Pressed += () => OpenOutputExportDialog(normalMap: true);
+            _elementActionBar.AddChild(normalExportButton);
+        }
+        Button clearButton = new() { Text = "Clear Preview" };
+        clearButton.Pressed += () => _canvasView.SetOutputPreview(null);
+        _elementActionBar.AddChild(clearButton);
+    }
+
+    private void PreviewOutput(bool normalMap)
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureOutputBinding output = _document?.ActiveOutput;
+        if (texture == null || output == null)
+        {
+            return;
+        }
+        Image scalar = PolyTextureBakeService.BakeScalar(texture, output, texture.PreviewWidthPx, texture.PreviewHeightPx);
+        Image preview = normalMap
+            ? PolyTextureBakeService.DeriveNormalMap(scalar, texture, output.HeightAmplitudeCm)
+            : scalar;
+        _canvasView.SetOutputPreview(preview);
+        SetStatus($"Previewing {(normalMap ? "Normal from " : string.Empty)}{output.Name} at {texture.PreviewWidthPx} x {texture.PreviewHeightPx} px.");
+    }
+
+    private void OpenOutputExportDialog(bool normalMap)
+    {
+        PolyTextureOutputBinding output = _document?.ActiveOutput;
+        if (output == null)
+        {
+            return;
+        }
+        _exportNormalMap = normalMap;
+        string suffix = normalMap ? "_normal" : output.Kind == PolyTextureOutputKind.Height ? "_height" : "_mask";
+        _outputExportDialog.CurrentFile = $"{SanitizeId(output.Name)}{suffix}.png";
+        _outputExportDialog.PopupCenteredRatio(0.6f);
+    }
+
+    private void ExportOutputToPath(string path)
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureOutputBinding output = _document?.ActiveOutput;
+        if (texture == null || output == null)
+        {
+            return;
+        }
+        if (!path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            path += ".png";
+        }
+        Image scalar = PolyTextureBakeService.BakeScalar(texture, output, texture.PreviewWidthPx, texture.PreviewHeightPx);
+        Image image = _exportNormalMap
+            ? PolyTextureBakeService.DeriveNormalMap(scalar, texture, output.HeightAmplitudeCm)
+            : scalar;
+        Error result = PolyTextureBakeService.SavePng(path, image);
+        SetStatus(result == Error.Ok ? $"Exported {path}." : $"Export failed: {result}.");
     }
 
     private void AddGuideSpinBox(string label, float value, Action<double> apply)
@@ -2237,6 +2325,7 @@ public partial class PolyTextureWorkspace : Control
 
     private void OnDocumentChanged()
     {
+        _canvasView.SetOutputPreview(null);
         MarkChanged();
         _canvasView.QueueRedraw();
         _inspector.Refresh();
@@ -2569,6 +2658,10 @@ public partial class PolyTextureWorkspace : Control
         }
 
         _canvasView.SetDocument(_document);
+        if (_document.SelectionKind != PolyTextureSelectionKind.Output)
+        {
+            _canvasView.SetOutputPreview(null);
+        }
         _inspector.SetDocument(_document);
         _canvasView.QueueRedraw();
         if (_sweepCreationState != SweepCreationState.None

@@ -51,6 +51,11 @@ Pure deterministic evaluator
 The evaluator must not mutate the document. Canvas, Inspector, bake services,
 and export must consume the same evaluated result.
 
+Scalar bakes rasterize that evaluated vector geometry deterministically at the
+selected preview/export resolution. Height and named Masks remain separate
+images. Normal maps are derived from the Height image plus its physical
+amplitude and surface-domain texel spacing; they are never authored outputs.
+
 ## Dependency rules
 
 References use stable IDs, never display names. Graph validation rejects

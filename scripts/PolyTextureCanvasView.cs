@@ -51,6 +51,7 @@ public partial class PolyTextureCanvasView : Control
     private PolyTextureGuide _guideAxisPreview;
     private bool _guideSelectionMode;
     private MirrorGeneratorElement _mirrorDraft;
+    private ImageTexture _outputPreviewTexture;
 
     public event Action<int> SelectedPointChanged;
     public event Action<Vector2> DrawPointRequested;
@@ -199,6 +200,12 @@ public partial class PolyTextureCanvasView : Control
         QueueRedraw();
     }
 
+    public void SetOutputPreview(Image image)
+    {
+        _outputPreviewTexture = image == null ? null : ImageTexture.CreateFromImage(image);
+        QueueRedraw();
+    }
+
     public void SetHandleView(PolyTextureHandleView handleView)
     {
         _handleView = handleView;
@@ -330,15 +337,25 @@ public partial class PolyTextureCanvasView : Control
 
         UpdateCanvasRect();
         DrawRect(_canvasRect, Colors.White, filled: true);
-        DrawGridOverlay();
+        if (_outputPreviewTexture != null)
+        {
+            DrawTextureRect(_outputPreviewTexture, _canvasRect, tile: false);
+        }
+        else
+        {
+            DrawGridOverlay();
+        }
         DrawRect(_canvasRect, new Color(0.74f, 0.76f, 0.78f), filled: false, width: 1.0f);
 
-        foreach (PolyTextureItem texture in _document.Textures)
+        if (_outputPreviewTexture == null)
         {
-            if (texture.Visible)
+            foreach (PolyTextureItem texture in _document.Textures)
             {
-                DrawTexturePreview(texture, texture == _document.ActiveTexture);
-                DrawGuides(texture, texture == _document.ActiveTexture);
+                if (texture.Visible)
+                {
+                    DrawTexturePreview(texture, texture == _document.ActiveTexture);
+                    DrawGuides(texture, texture == _document.ActiveTexture);
+                }
             }
         }
 

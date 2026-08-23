@@ -17,6 +17,8 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
         Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
+        Run("height and mask baking is deterministic", TestDeterministicBake);
+        Run("normal maps derive only from height", TestNormalDerivation);
         Run("display rename preserves stable references", TestRenamePreservesReferences);
         Run("dependency-aware deletion blocks used inputs", TestDependencyDeletion);
         Run("validator rejects missing generator inputs", TestMissingReferenceValidation);
@@ -100,6 +102,8 @@ public partial class PolyTextureTestRunner : SceneTree
     private static void TestOutputRoundTrip()
     {
         PolyTextureDocument document = CreateGeneratorDocument();
+        document.ActiveOutputId = "height";
+        document.SelectionKind = PolyTextureSelectionKind.Output;
         string path = "user://polytexture_test_outputs.polytexture.json";
         Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
         Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
@@ -107,8 +111,11 @@ public partial class PolyTextureTestRunner : SceneTree
         PolyTextureOutputBinding height = loaded.Textures[0].GetOutput("height");
         Equal(PolyTextureOutputKind.Height, height.Kind, "height kind");
         Equal("sweep", height.SourceElementIds[0], "height source");
+        Equal(2, height.SourceElementIds.Count, "height source count");
         Near(0.8f, height.HeightAmplitudeCm, 0.0001f, "height amplitude");
         Equal("Leaf Veins", loaded.Textures[0].GetOutput("veins").Name, "mask name");
+        Equal(PolyTextureSelectionKind.Output, loaded.SelectionKind, "output selection kind");
+        Equal("height", loaded.ActiveOutputId, "active output id");
     }
 
     private static void TestSweepDeterminism()
@@ -181,6 +188,53 @@ public partial class PolyTextureTestRunner : SceneTree
         Equal("source", source.Id, "stable source id");
         Equal("source", sweep.SourceElementId, "stable sweep reference");
         Assert(PolyTextureValidator.Validate(document, out string error), error);
+    }
+
+    private static void TestDeterministicBake()
+    {
+        PolyTextureDocument document = CreateGeneratorDocument();
+        PolyTextureItem texture = document.Textures[0];
+        PolyTextureOutputBinding output = texture.GetOutput("height");
+        Image first = PolyTextureBakeService.BakeScalar(texture, output, 64, 48);
+        Image second = PolyTextureBakeService.BakeScalar(texture, output, 64, 48);
+        Equal(64, first.GetWidth(), "bake width");
+        Equal(48, first.GetHeight(), "bake height");
+        int litPixels = 0;
+        for (int y = 0; y < first.GetHeight(); y++)
+        {
+            for (int x = 0; x < first.GetWidth(); x++)
+            {
+                Near(first.GetPixel(x, y).R, second.GetPixel(x, y).R, 0.0001f, $"deterministic pixel {x},{y}");
+                litPixels += first.GetPixel(x, y).R > 0.0f ? 1 : 0;
+            }
+        }
+        Assert(litPixels > 0 && litPixels < first.GetWidth() * first.GetHeight(), "bake should contain foreground and background");
+        Assert(PolyTextureBakeService.SavePng("user://polytexture_test_height.png", first) == Error.Ok, "PNG export failed");
+        Assert(FileAccess.FileExists("user://polytexture_test_height.png"), "PNG export file missing");
+    }
+
+    private static void TestNormalDerivation()
+    {
+        PolyTextureDocument document = CreateGeneratorDocument();
+        PolyTextureItem texture = document.Textures[0];
+        PolyTextureOutputBinding output = texture.GetOutput("height");
+        Image height = PolyTextureBakeService.BakeScalar(texture, output, 64, 64);
+        Image normal = PolyTextureBakeService.DeriveNormalMap(height, texture, output.HeightAmplitudeCm);
+        Equal(Image.Format.Rgb8, normal.GetFormat(), "normal format");
+        bool hasSlope = false;
+        for (int y = 0; y < normal.GetHeight() && !hasSlope; y++)
+        {
+            for (int x = 0; x < normal.GetWidth(); x++)
+            {
+                Color pixel = normal.GetPixel(x, y);
+                if (Mathf.Abs(pixel.R - 0.5f) > 0.01f || Mathf.Abs(pixel.G - 0.5f) > 0.01f)
+                {
+                    hasSlope = true;
+                    break;
+                }
+            }
+        }
+        Assert(hasSlope, "derived normal should contain slopes at height boundaries");
     }
 
     private static void TestMirrorGeneratorChain()
@@ -305,6 +359,7 @@ public partial class PolyTextureTestRunner : SceneTree
             HeightAmplitudeCm = 0.8f
         });
         texture.Outputs[^1].SourceElementIds.Add(sweep.Id);
+        texture.Outputs[^1].SourceElementIds.Add(target.Id);
         texture.Outputs.Add(new PolyTextureOutputBinding
         {
             Id = "veins",

@@ -65,6 +65,11 @@ bindings additionally declare their physical amplitude in centimeters. Mask
 bindings use their mutable display name as the artist-facing semantic label;
 their stable ID remains the technical identity.
 
+The current PNG bake writes one grayscale file per scalar output. A Height
+binding may additionally export a tangent-space Normal image derived from the
+same rasterized Height field. Bake files are derived data and are not embedded
+in the canonical document.
+
 ## Animation metadata
 
 Generated vector segments and instances may carry normalized `reveal_start`,
