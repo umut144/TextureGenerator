@@ -16,6 +16,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
         Run("crack lines remain semantic editable paths", TestCrackLineRoundTrip);
+        Run("draw width applies to subsequent path points", TestDrawPointWidth);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
         Run("branch generator produces deterministic crack structures", TestBranchGenerator);
@@ -240,6 +241,16 @@ public partial class PolyTextureTestRunner : SceneTree
         Assert(loadedCrack.SupportsBezierHandles, "crack line must keep Bezier editing");
         Near(1.5f, loadedCrack.Falloff, 0.0001f, "crack falloff");
         Equal(2, loadedCrack.Points.Count, "crack point count");
+    }
+
+    private static void TestDrawPointWidth()
+    {
+        CenterStrokePoint first = PolyTextureWorkspace.CreateDrawPoint(new Vector2(4.0f, 8.0f), 3.25f, supportsBezierHandles: true);
+        Near(3.25f, first.LeftWidth, 0.0001f, "draw point left width");
+        Near(3.25f, first.RightWidth, 0.0001f, "draw point right width");
+        Equal(PolyTextureHandleMode.Aligned, first.HandleMode, "draw point path handle mode");
+        CenterStrokePoint clamped = PolyTextureWorkspace.CreateDrawPoint(Vector2.Zero, -2.0f, supportsBezierHandles: false);
+        Near(0.01f, clamped.LeftWidth, 0.0001f, "draw point minimum width");
     }
 
     private static void TestRepeatGrid()

@@ -66,6 +66,7 @@ public partial class PolyTextureWorkspace : Control
     private MenuButton _filterMenuButton;
     private MenuButton _guideMenuButton;
     private Button _pointPlacementButton;
+    private SpinBox _drawWidthSpinBox;
     private HBoxContainer _elementActionBar;
     private CheckBox _snapCheckBox;
     private OptionButton _snapStepOptionButton;
@@ -88,6 +89,7 @@ public partial class PolyTextureWorkspace : Control
     private MirrorCreationState _mirrorCreationState;
     private MirrorGeneratorElement _mirrorDraft;
     private bool _exportNormalMap;
+    private float _drawPointWidthCm = 12.0f;
 
     public override void _Ready()
     {
@@ -343,6 +345,18 @@ public partial class PolyTextureWorkspace : Control
         _drawMenuButton = new MenuButton { Text = "Draw" };
         _drawMenuButton.GetPopup().IdPressed += OnDrawMenuPressed;
         toolbar.AddChild(_drawMenuButton);
+
+        toolbar.AddChild(new Label { Text = "Draw Width (cm)" });
+        _drawWidthSpinBox = new SpinBox
+        {
+            MinValue = 0.01,
+            MaxValue = 100000.0,
+            Step = 0.01,
+            Value = _drawPointWidthCm,
+            CustomMinimumSize = new Vector2(92, 0)
+        };
+        _drawWidthSpinBox.ValueChanged += value => _drawPointWidthCm = (float)value;
+        toolbar.AddChild(_drawWidthSpinBox);
 
         _guideMenuButton = new MenuButton { Text = "Sources" };
         PopupMenu guidePopup = _guideMenuButton.GetPopup();
@@ -2066,20 +2080,26 @@ public partial class PolyTextureWorkspace : Control
         {
             localPosition = centerStroke.Transform.InverseTransformPoint(documentPosition);
         }
-        CenterStrokePoint point = new()
-        {
-            X = localPosition.X,
-            Y = localPosition.Y,
-            LeftWidth = 12.0f,
-            RightWidth = 12.0f,
-            HandleMode = _document.ActiveCenterStroke.SupportsBezierHandles ? PolyTextureHandleMode.Aligned : PolyTextureHandleMode.Linear
-        };
+        CenterStrokePoint point = CreateDrawPoint(localPosition, _drawPointWidthCm, _document.ActiveCenterStroke.SupportsBezierHandles);
         centerStroke.Points.Add(point);
         SortCenterStrokePoints(centerStroke);
         centerStroke.NormalizeLocalAxes();
         _canvasView.SelectPoint(centerStroke.Points.IndexOf(point));
         RefreshAll();
         MarkChanged("Center stroke point added.");
+    }
+
+    public static CenterStrokePoint CreateDrawPoint(Vector2 localPosition, float widthCm, bool supportsBezierHandles)
+    {
+        float width = Mathf.Max(0.01f, widthCm);
+        return new CenterStrokePoint
+        {
+            X = localPosition.X,
+            Y = localPosition.Y,
+            LeftWidth = width,
+            RightWidth = width,
+            HandleMode = supportsBezierHandles ? PolyTextureHandleMode.Aligned : PolyTextureHandleMode.Linear
+        };
     }
 
     private void BeginPointPlacement()
