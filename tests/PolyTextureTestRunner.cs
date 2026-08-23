@@ -16,6 +16,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
+        Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
         Run("display rename preserves stable references", TestRenamePreservesReferences);
         Run("dependency-aware deletion blocks used inputs", TestDependencyDeletion);
         Run("validator rejects missing generator inputs", TestMissingReferenceValidation);
@@ -105,7 +106,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Equal(2, loaded.Textures[0].Outputs.Count, "output count");
         PolyTextureOutputBinding height = loaded.Textures[0].GetOutput("height");
         Equal(PolyTextureOutputKind.Height, height.Kind, "height kind");
-        Equal("sweep", height.SourceElementId, "height source");
+        Equal("sweep", height.SourceElementIds[0], "height source");
         Near(0.8f, height.HeightAmplitudeCm, 0.0001f, "height amplitude");
         Equal("Leaf Veins", loaded.Textures[0].GetOutput("veins").Name, "mask name");
     }
@@ -182,6 +183,34 @@ public partial class PolyTextureTestRunner : SceneTree
         Assert(PolyTextureValidator.Validate(document, out string error), error);
     }
 
+    private static void TestMirrorGeneratorChain()
+    {
+        PolyTextureDocument document = CreateGeneratorDocument();
+        PolyTextureItem texture = document.Textures[0];
+        texture.Guides.Add(new PolyTextureGuide
+        {
+            Id = "axis",
+            Name = "Leaf Axis",
+            Type = PolyTextureGuideType.Axis,
+            Position = Vector2.Zero,
+            AxisEnd = Vector2.Up
+        });
+        MirrorGeneratorElement mirror = new()
+        {
+            Id = "mirror",
+            Name = "Mirror Veins",
+            SourceElementId = "sweep",
+            AxisGuideId = "axis",
+            RenderSource = true
+        };
+        texture.Elements.Add(mirror);
+
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        Equal(8, evaluation.GetGeometry("mirror").Count, "combined mirrored sweep polygon count");
+        Assert(evaluation.HiddenSourceIds.Contains("sweep"), "mirror should replace its upstream preview");
+        Assert(PolyTextureValidator.Validate(document, out string error), error);
+    }
+
     private static void TestDependencyDeletion()
     {
         PolyTextureDocument document = CreateGeneratorDocument();
@@ -197,13 +226,13 @@ public partial class PolyTextureTestRunner : SceneTree
         SweepGeneratorElement sweep = document.Textures[0].GetElement("sweep") as SweepGeneratorElement;
         sweep.SourceElementId = "missing";
         Assert(!PolyTextureValidator.Validate(document, out string error), "missing source should fail validation");
-        Assert(error.Contains("existing", StringComparison.Ordinal), "missing reference diagnostic should be concrete");
+        Assert(error.Contains("preceding", StringComparison.Ordinal), "missing reference diagnostic should be concrete");
     }
 
     private static void TestMissingOutputReferenceValidation()
     {
         PolyTextureDocument document = CreateGeneratorDocument();
-        document.Textures[0].GetOutput("height").SourceElementId = "missing";
+        document.Textures[0].GetOutput("height").SourceElementIds[0] = "missing";
         Assert(!PolyTextureValidator.Validate(document, out string error), "missing output source should fail validation");
         Assert(error.Contains("existing element", StringComparison.Ordinal), "missing output diagnostic should be concrete");
     }
@@ -273,16 +302,16 @@ public partial class PolyTextureTestRunner : SceneTree
             Id = "height",
             Name = "Height",
             Kind = PolyTextureOutputKind.Height,
-            SourceElementId = sweep.Id,
             HeightAmplitudeCm = 0.8f
         });
+        texture.Outputs[^1].SourceElementIds.Add(sweep.Id);
         texture.Outputs.Add(new PolyTextureOutputBinding
         {
             Id = "veins",
             Name = "Leaf Veins",
             Kind = PolyTextureOutputKind.Mask,
-            SourceElementId = sweep.Id
         });
+        texture.Outputs[^1].SourceElementIds.Add(sweep.Id);
         document.Textures.Add(texture);
         return document;
     }

@@ -142,10 +142,19 @@ public static class PolyTextureValidator
                     error = $"{outputPath}.name is required";
                     return false;
                 }
-                if (!elementIds.Contains(output.SourceElementId))
+                if (output.SourceElementIds.Count == 0)
                 {
-                    error = $"{outputPath}.source_element_id must reference an existing element";
+                    error = $"{outputPath}.source_element_ids must contain at least one element";
                     return false;
+                }
+                HashSet<string> outputSourceIds = new(System.StringComparer.Ordinal);
+                foreach (string sourceElementId in output.SourceElementIds)
+                {
+                    if (!elementIds.Contains(sourceElementId) || !outputSourceIds.Add(sourceElementId))
+                    {
+                        error = $"{outputPath}.source_element_ids must contain unique existing elements";
+                        return false;
+                    }
                 }
                 if (!float.IsFinite(output.Value) || output.Value < 0.0f || output.Value > 1.0f)
                 {
@@ -165,27 +174,31 @@ public static class PolyTextureValidator
                 hasHeightOutput |= output.Kind == PolyTextureOutputKind.Height;
             }
 
+            HashSet<string> evaluatedElementIds = new(System.StringComparer.Ordinal);
             foreach (PolyTextureElement element in texture.Elements)
             {
                 if (element is SweepGeneratorElement sweep)
                 {
                     if (texture.GetCenterStroke(sweep.SourceElementId) == null
-                        || texture.GetCenterStroke(sweep.TargetElementId) == null)
+                        || texture.GetCenterStroke(sweep.TargetElementId) == null
+                        || !evaluatedElementIds.Contains(sweep.SourceElementId)
+                        || !evaluatedElementIds.Contains(sweep.TargetElementId))
                     {
-                        error = $"{path}.elements[{element.Id}] must reference existing stroke or path inputs";
+                        error = $"{path}.elements[{element.Id}] must reference preceding stroke or path inputs";
                         return false;
                     }
                 }
                 else if (element is MirrorGeneratorElement mirror)
                 {
                     PolyTextureGuide axis = texture.GetGuide(mirror.AxisGuideId);
-                    if (texture.GetCenterStroke(mirror.SourceElementId) == null
+                    if (!evaluatedElementIds.Contains(mirror.SourceElementId)
                         || axis?.Type != PolyTextureGuideType.Axis)
                     {
-                        error = $"{path}.elements[{element.Id}] must reference an existing source and axis guide";
+                        error = $"{path}.elements[{element.Id}] must reference a preceding source and an existing axis guide";
                         return false;
                     }
                 }
+                evaluatedElementIds.Add(element.Id);
             }
         }
 
@@ -200,7 +213,14 @@ public static class PolyTextureValidator
             return false;
         }
 
-        if (document.SelectionKind is not PolyTextureSelectionKind.Texture and not PolyTextureSelectionKind.Guide && document.ActiveElement == null)
+        if (document.SelectionKind == PolyTextureSelectionKind.Output && document.ActiveOutput == null)
+        {
+            error = "active_output_id must refer to an output on the active texture";
+            return false;
+        }
+
+        if (document.SelectionKind is not PolyTextureSelectionKind.Texture and not PolyTextureSelectionKind.Guide and not PolyTextureSelectionKind.Output
+            && document.ActiveElement == null)
         {
             error = "active_element_id must refer to an element on the active texture";
             return false;
@@ -577,7 +597,7 @@ public static class PolyTextureValidator
             if (!RequireString(output, "id", out string id, out error, outputPath)
                 || !RequireString(output, "name", out _, out error, outputPath)
                 || !RequireString(output, "kind", out string kind, out error, outputPath)
-                || !RequireString(output, "source_element_id", out string sourceId, out error, outputPath)
+                || !RequireArray(output, "source_element_ids", out Godot.Collections.Array sourceIds, out error, outputPath)
                 || !RequireBool(output, "enabled", out _, out error, outputPath)
                 || !RequireNumber(output, "value", out float value, out error, outputPath)
                 || !RequireNumber(output, "height_amplitude_cm", out float amplitude, out error, outputPath))
@@ -586,10 +606,19 @@ public static class PolyTextureValidator
             }
 
             bool isHeight = kind.Equals("height", System.StringComparison.Ordinal);
+            HashSet<string> uniqueSourceIds = new(System.StringComparer.Ordinal);
+            bool validSources = sourceIds.Count > 0;
+            foreach (Variant sourceVariant in sourceIds)
+            {
+                validSources &= sourceVariant.VariantType == Variant.Type.String
+                    && elementIds.Contains(sourceVariant.AsString())
+                    && uniqueSourceIds.Add(sourceVariant.AsString());
+            }
+
             if ((!isHeight && !kind.Equals("mask", System.StringComparison.Ordinal))
                 || string.IsNullOrWhiteSpace(id)
                 || !outputIds.Add(id)
-                || !elementIds.Contains(sourceId)
+                || !validSources
                 || !float.IsFinite(value) || value < 0.0f || value > 1.0f
                 || !float.IsFinite(amplitude) || amplitude <= 0.0f
                 || isHeight && hasHeightOutput)

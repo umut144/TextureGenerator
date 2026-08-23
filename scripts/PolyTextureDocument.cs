@@ -15,6 +15,7 @@ public sealed class PolyTextureDocument
     public string ActiveTextureId { get; set; } = string.Empty;
     public string ActiveElementId { get; set; } = string.Empty;
     public string ActiveGuideId { get; set; } = string.Empty;
+    public string ActiveOutputId { get; set; } = string.Empty;
     public int SelectedPointIndex { get; set; } = -1;
     public PolyTextureSelectionKind SelectionKind { get; set; } = PolyTextureSelectionKind.Texture;
     public List<PolyTextureItem> Textures { get; } = new();
@@ -37,6 +38,7 @@ public sealed class PolyTextureDocument
 
     public PolyTextureElement ActiveElement => ActiveTexture?.GetElement(ActiveElementId);
     public PolyTextureGuide ActiveGuide => ActiveTexture?.GetGuide(ActiveGuideId);
+    public PolyTextureOutputBinding ActiveOutput => ActiveTexture?.GetOutput(ActiveOutputId);
 
     public CenterStrokeElement ActiveCenterStroke => ActiveElement as CenterStrokeElement;
 
@@ -58,6 +60,7 @@ public sealed class PolyTextureDocument
             ActiveTextureId = string.Empty;
             ActiveElementId = string.Empty;
             ActiveGuideId = string.Empty;
+            ActiveOutputId = string.Empty;
             SelectedPointIndex = -1;
             SelectionKind = PolyTextureSelectionKind.Texture;
             return;
@@ -75,6 +78,11 @@ public sealed class PolyTextureDocument
             ActiveGuideId = string.Empty;
         }
 
+        if (activeTexture.GetOutput(ActiveOutputId) == null)
+        {
+            ActiveOutputId = string.Empty;
+        }
+
         CenterStrokeElement centerStroke = ActiveCenterStroke;
         if (centerStroke == null || SelectedPointIndex < 0 || SelectedPointIndex >= centerStroke.Points.Count)
         {
@@ -89,9 +97,12 @@ public sealed class PolyTextureDocument
 
         if (string.IsNullOrEmpty(ActiveElementId) && SelectionKind != PolyTextureSelectionKind.Texture)
         {
-            SelectionKind = SelectionKind == PolyTextureSelectionKind.Guide && ActiveGuide != null
-                ? PolyTextureSelectionKind.Guide
-                : PolyTextureSelectionKind.Texture;
+            SelectionKind = SelectionKind switch
+            {
+                PolyTextureSelectionKind.Guide when ActiveGuide != null => PolyTextureSelectionKind.Guide,
+                PolyTextureSelectionKind.Output when ActiveOutput != null => PolyTextureSelectionKind.Output,
+                _ => PolyTextureSelectionKind.Texture
+            };
         }
     }
 
@@ -109,6 +120,7 @@ public sealed class PolyTextureDocument
             ActiveTextureId = ActiveTextureId,
             ActiveElementId = ActiveElementId,
             ActiveGuideId = ActiveGuideId,
+            ActiveOutputId = ActiveOutputId,
             SelectedPointIndex = SelectedPointIndex,
             SelectionKind = SelectionKind
         };

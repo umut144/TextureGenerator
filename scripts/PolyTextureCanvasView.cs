@@ -387,27 +387,33 @@ public partial class PolyTextureCanvasView : Control
         foreach (SweepGeneratorElement sweep in evaluation.LiveSweeps)
         {
             bool operationActive = active && sweep == _document.ActiveElement;
-            DrawSweepPreview(texture, sweep, operationActive);
+            if (!evaluation.HiddenSourceIds.Contains(sweep.Id) || operationActive)
+            {
+                DrawSweepPreview(texture, sweep, operationActive, polygons: evaluation.GetGeometry(sweep.Id));
+            }
         }
 
         foreach (MirrorGeneratorElement mirror in evaluation.LiveMirrors)
         {
-            DrawMirrorPreview(texture, mirror, isDraft: false);
+            bool operationActive = active && mirror == _document.ActiveElement;
+            if (!evaluation.HiddenSourceIds.Contains(mirror.Id) || operationActive)
+            {
+                DrawMirrorPreview(texture, mirror, isDraft: false, polygons: evaluation.GetGeometry(mirror.Id));
+            }
         }
     }
 
-    private void DrawMirrorPreview(PolyTextureItem texture, MirrorGeneratorElement mirror, bool isDraft)
+    private void DrawMirrorPreview(PolyTextureItem texture, MirrorGeneratorElement mirror, bool isDraft, List<List<Vector2>> polygons = null)
     {
-        List<Vector2> polygon = PolyTextureRenderer.BuildMirrorPolygon(texture, mirror);
-        if (polygon.Count < 3)
+        if (polygons == null)
         {
-            return;
-        }
-
-        Vector2[] screenPolygon = new Vector2[polygon.Count];
-        for (int index = 0; index < polygon.Count; index++)
-        {
-            screenPolygon[index] = DocumentToScreen(polygon[index]);
+            PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+            List<List<Vector2>> sourceGeometry = evaluation.GetGeometry(mirror.SourceElementId);
+            polygons = PolyTextureRenderer.BuildMirrorPolygons(texture, mirror, sourceGeometry);
+            if (mirror.RenderSource)
+            {
+                polygons.InsertRange(0, sourceGeometry);
+            }
         }
 
         float opacity = Mathf.Clamp(mirror.Opacity, 0.0f, 1.0f);
@@ -417,14 +423,22 @@ public partial class PolyTextureCanvasView : Control
         Color outlineColor = isDraft
             ? new Color(0.82f, 0.46f, 0.08f, 0.92f)
             : new Color(0.1f, 0.32f, 0.2f, 0.68f);
-        if (CanFillPolygon(screenPolygon))
+        foreach (List<Vector2> polygon in polygons)
         {
-            DrawColoredPolygon(screenPolygon, fillColor);
+            Vector2[] screenPolygon = new Vector2[polygon.Count];
+            for (int index = 0; index < polygon.Count; index++)
+            {
+                screenPolygon[index] = DocumentToScreen(polygon[index]);
+            }
+            if (CanFillPolygon(screenPolygon))
+            {
+                DrawColoredPolygon(screenPolygon, fillColor);
+            }
+            DrawPolyline(ClosePolyline(screenPolygon), outlineColor, width: isDraft ? 1.8f : 1.2f);
         }
-        DrawPolyline(ClosePolyline(screenPolygon), outlineColor, width: isDraft ? 1.8f : 1.2f);
     }
 
-    private void DrawSweepPreview(PolyTextureItem texture, SweepGeneratorElement sweep, bool active, bool isDraft = false)
+    private void DrawSweepPreview(PolyTextureItem texture, SweepGeneratorElement sweep, bool active, bool isDraft = false, List<List<Vector2>> polygons = null)
     {
         float opacity = Mathf.Clamp(sweep.Opacity, 0.0f, 1.0f) * (active ? 1.0f : 0.72f);
         Color fillColor = isDraft
@@ -436,7 +450,7 @@ public partial class PolyTextureCanvasView : Control
             ? new Color(0.82f, 0.46f, 0.08f, 0.92f)
             : new Color(0.1f, 0.32f, 0.2f, active ? 0.82f : 0.48f);
 
-        foreach (List<Vector2> polygon in PolyTextureRenderer.BuildSweepPolygons(texture, sweep))
+        foreach (List<Vector2> polygon in polygons ?? PolyTextureRenderer.BuildSweepPolygons(texture, sweep))
         {
             Vector2[] screenPolygon = new Vector2[polygon.Count];
             for (int index = 0; index < polygon.Count; index++)

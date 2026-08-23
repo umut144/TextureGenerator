@@ -84,6 +84,7 @@ public static class PolyTextureStore
         builder.AppendLine($"  \"active_texture_id\": \"{EscapeJson(document.ActiveTextureId)}\",");
         builder.AppendLine($"  \"active_element_id\": \"{EscapeJson(document.ActiveElementId)}\",");
         builder.AppendLine($"  \"active_guide_id\": \"{EscapeJson(document.ActiveGuideId)}\",");
+        builder.AppendLine($"  \"active_output_id\": \"{EscapeJson(document.ActiveOutputId)}\",");
         builder.AppendLine($"  \"selection_kind\": \"{EscapeJson(document.SelectionKind.ToString().ToLowerInvariant())}\",");
         builder.AppendLine($"  \"selected_point_index\": {document.SelectedPointIndex},");
         builder.AppendLine("  \"textures\": [");
@@ -171,7 +172,13 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(output.Id)}\",");
         builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(output.Name)}\",");
         builder.AppendLine($"{indent}  \"kind\": \"{OutputKindToJson(output.Kind)}\",");
-        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(output.SourceElementId)}\",");
+        builder.Append($"{indent}  \"source_element_ids\": [");
+        for (int sourceIndex = 0; sourceIndex < output.SourceElementIds.Count; sourceIndex++)
+        {
+            string sourceSuffix = sourceIndex == output.SourceElementIds.Count - 1 ? string.Empty : ", ";
+            builder.Append($"\"{EscapeJson(output.SourceElementIds[sourceIndex])}\"{sourceSuffix}");
+        }
+        builder.AppendLine("],");
         builder.AppendLine($"{indent}  \"enabled\": {JsonBool(output.Enabled)},");
         builder.AppendLine($"{indent}  \"value\": {Number(output.Value)},");
         builder.AppendLine($"{indent}  \"height_amplitude_cm\": {Number(output.HeightAmplitudeCm)}");
@@ -275,6 +282,7 @@ public static class PolyTextureStore
             ActiveTextureId = root["active_texture_id"].AsString(),
             ActiveElementId = ReadString(root, "active_element_id", "center_stroke"),
             ActiveGuideId = ReadString(root, "active_guide_id", string.Empty),
+            ActiveOutputId = ReadString(root, "active_output_id", string.Empty),
             SelectedPointIndex = ReadInt(root, "selected_point_index", -1),
             SelectionKind = ReadSelectionKind(ReadString(root, "selection_kind", "texture"))
         };
@@ -408,16 +416,20 @@ public static class PolyTextureStore
 
     private static PolyTextureOutputBinding ReadOutput(Godot.Collections.Dictionary output)
     {
-        return new PolyTextureOutputBinding
+        PolyTextureOutputBinding binding = new()
         {
             Id = ReadString(output, "id", "output"),
             Name = ReadString(output, "name", "Output"),
             Kind = ReadOutputKind(ReadString(output, "kind", "mask")),
-            SourceElementId = ReadString(output, "source_element_id", string.Empty),
             Enabled = ReadBool(output, "enabled", true),
             Value = ReadFloat(output, "value", 1.0f),
             HeightAmplitudeCm = ReadFloat(output, "height_amplitude_cm", 1.0f)
         };
+        foreach (Variant sourceVariant in output["source_element_ids"].AsGodotArray())
+        {
+            binding.SourceElementIds.Add(sourceVariant.AsString());
+        }
+        return binding;
     }
 
     private static CenterStrokeElement ReadCenterStroke(Godot.Collections.Dictionary centerStroke, bool supportsBezierHandles)
@@ -587,6 +599,7 @@ public static class PolyTextureStore
             "element" => PolyTextureSelectionKind.Element,
             "point" => PolyTextureSelectionKind.Point,
             "guide" => PolyTextureSelectionKind.Guide,
+            "output" => PolyTextureSelectionKind.Output,
             _ => PolyTextureSelectionKind.Texture
         };
     }

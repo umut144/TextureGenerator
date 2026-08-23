@@ -29,7 +29,7 @@ public static class PolyTextureDependencyService
 
         foreach (PolyTextureOutputBinding output in texture.Outputs)
         {
-            if (output.SourceElementId.Equals(elementId, StringComparison.Ordinal))
+            if (output.SourceElementIds.Contains(elementId))
             {
                 dependents.Add(output.Id);
             }

@@ -159,6 +159,31 @@ public static class PolyTextureRenderer
         return mirrored == null ? new List<Vector2>() : BuildFilledPolygon(mirrored);
     }
 
+    public static List<List<Vector2>> BuildMirrorPolygons(PolyTextureItem texture, MirrorGeneratorElement mirror, List<List<Vector2>> sourcePolygons)
+    {
+        List<List<Vector2>> mirroredPolygons = new();
+        PolyTextureGuide axis = texture?.GetGuide(mirror?.AxisGuideId ?? string.Empty);
+        if (mirror == null || !mirror.Enabled || axis?.Type != PolyTextureGuideType.Axis
+            || (axis.AxisEnd - axis.Position).LengthSquared() < 0.0001f)
+        {
+            return mirroredPolygons;
+        }
+
+        foreach (List<Vector2> sourcePolygon in sourcePolygons)
+        {
+            List<Vector2> mirroredPolygon = new(sourcePolygon.Count);
+            foreach (Vector2 point in sourcePolygon)
+            {
+                mirroredPolygon.Add(ReflectAcrossAxis(point, axis));
+            }
+            if (mirroredPolygon.Count >= 3)
+            {
+                mirroredPolygons.Add(mirroredPolygon);
+            }
+        }
+        return mirroredPolygons;
+    }
+
     public static CenterStrokeElement BuildMirrorElement(PolyTextureItem texture, MirrorGeneratorElement mirror)
     {
         if (texture == null || mirror == null || !mirror.Enabled)

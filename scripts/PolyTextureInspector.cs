@@ -10,6 +10,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _elementInspector;
     private VBoxContainer _sweepInspector;
     private VBoxContainer _pointInspector;
+    private VBoxContainer _outputInspector;
 
     private LineEdit _textureNameLineEdit;
     private OptionButton _textureOriginOptionButton;
@@ -63,6 +64,13 @@ public partial class PolyTextureInspector : PanelContainer
     private HBoxContainer _elementRotationRow;
     private HBoxContainer _elementLengthScaleRow;
     private HBoxContainer _elementWidthScaleRow;
+    private LineEdit _outputNameLineEdit;
+    private CheckBox _outputEnabledCheckBox;
+    private Label _outputKindLabel;
+    private Label _outputSourcesLabel;
+    private SpinBox _outputValueSpinBox;
+    private SpinBox _outputHeightAmplitudeSpinBox;
+    private HBoxContainer _outputHeightAmplitudeRow;
 
     public event Action DocumentChanged;
 
@@ -94,11 +102,13 @@ public partial class PolyTextureInspector : PanelContainer
         CenterStrokePoint centerStrokePoint = point as CenterStrokePoint;
         bool hasTexture = texture != null;
         bool supportsBezierHandles = element?.SupportsBezierHandles == true;
+        PolyTextureOutputBinding output = _document.ActiveOutput;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
         _elementInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element;
         _sweepInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && sweep != null;
         _pointInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Point;
+        _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
         _domainWidthSpinBox.Editable = hasTexture;
@@ -229,6 +239,28 @@ public partial class PolyTextureInspector : PanelContainer
             _inHandleYSpinBox.Value = 0;
             _outHandleXSpinBox.Value = 0;
             _outHandleYSpinBox.Value = 0;
+        }
+
+
+        if (output != null)
+        {
+            _outputNameLineEdit.Text = output.Name;
+            _outputEnabledCheckBox.ButtonPressed = output.Enabled;
+            _outputKindLabel.Text = output.Kind == PolyTextureOutputKind.Height ? "Height" : "Mask";
+            _outputSourcesLabel.Text = string.Join(", ", output.SourceElementIds);
+            _outputValueSpinBox.Value = output.Value;
+            _outputHeightAmplitudeSpinBox.Value = output.HeightAmplitudeCm;
+            _outputHeightAmplitudeRow.Visible = output.Kind == PolyTextureOutputKind.Height;
+        }
+        else
+        {
+            _outputNameLineEdit.Text = string.Empty;
+            _outputEnabledCheckBox.ButtonPressed = false;
+            _outputKindLabel.Text = string.Empty;
+            _outputSourcesLabel.Text = string.Empty;
+            _outputValueSpinBox.Value = 1.0;
+            _outputHeightAmplitudeSpinBox.Value = 1.0;
+            _outputHeightAmplitudeRow.Visible = false;
         }
 
         _refreshing = false;
@@ -439,6 +471,29 @@ public partial class PolyTextureInspector : PanelContainer
         _outHandleYSpinBox = CreateSpinBox(-4096, 4096, 0.01);
         _outHandleYRow = AddField(_pointInspector, "Out Handle Y (cm)", _outHandleYSpinBox);
         _outHandleYSpinBox.ValueChanged += value => ApplyCenterStrokePointChange(point => point.OutHandle = new Vector2(point.OutHandle.X, (float)value));
+
+        _outputInspector = CreateSection(stack, "Output");
+        _outputNameLineEdit = new LineEdit { PlaceholderText = "Output name" };
+        _outputNameLineEdit.TextSubmitted += ApplyOutputName;
+        _outputNameLineEdit.FocusExited += () => ApplyOutputName(_outputNameLineEdit.Text);
+        _outputInspector.AddChild(_outputNameLineEdit);
+
+        _outputEnabledCheckBox = new CheckBox { Text = "Enabled" };
+        _outputEnabledCheckBox.Toggled += value => ApplyOutputChange(output => output.Enabled = value);
+        _outputInspector.AddChild(_outputEnabledCheckBox);
+
+        _outputKindLabel = new Label();
+        AddField(_outputInspector, "Kind", _outputKindLabel);
+        _outputSourcesLabel = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        AddField(_outputInspector, "Sources", _outputSourcesLabel);
+
+        _outputValueSpinBox = CreateSpinBox(0, 1, 0.01);
+        AddField(_outputInspector, "Value", _outputValueSpinBox);
+        _outputValueSpinBox.ValueChanged += value => ApplyOutputChange(output => output.Value = (float)value);
+
+        _outputHeightAmplitudeSpinBox = CreateSpinBox(0.01, 1000, 0.01);
+        _outputHeightAmplitudeRow = AddField(_outputInspector, "Amplitude (cm)", _outputHeightAmplitudeSpinBox);
+        _outputHeightAmplitudeSpinBox.ValueChanged += value => ApplyOutputChange(output => output.HeightAmplitudeCm = (float)value);
     }
 
     private static VBoxContainer CreateSection(VBoxContainer stack, string title)
@@ -537,6 +592,23 @@ public partial class PolyTextureInspector : PanelContainer
         apply(_document.ActiveElement);
         DocumentChanged?.Invoke();
         Refresh();
+    }
+
+    private void ApplyOutputChange(Action<PolyTextureOutputBinding> apply)
+    {
+        if (_refreshing || _document?.ActiveOutput == null)
+        {
+            return;
+        }
+
+        apply(_document.ActiveOutput);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplyOutputName(string value)
+    {
+        ApplyOutputChange(output => output.Name = CleanName(value, output.Name));
     }
 
     private void ApplyElementName(string value)

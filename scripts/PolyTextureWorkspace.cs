@@ -404,6 +404,15 @@ public partial class PolyTextureWorkspace : Control
         _outlinerTree.ItemEdited += OnOutlinerItemEdited;
         outlinerStack.AddChild(_outlinerTree);
 
+        HBoxContainer outputButtons = new();
+        Button addHeightOutputButton = new() { Text = "+ Height", TooltipText = "Bind one Height output to the visible evaluated graph." };
+        addHeightOutputButton.Pressed += () => AddOutput(PolyTextureOutputKind.Height);
+        outputButtons.AddChild(addHeightOutputButton);
+        Button addMaskOutputButton = new() { Text = "+ Mask", TooltipText = "Bind a named mask to the visible evaluated graph." };
+        addMaskOutputButton.Pressed += () => AddOutput(PolyTextureOutputKind.Mask);
+        outputButtons.AddChild(addMaskOutputButton);
+        outlinerStack.AddChild(outputButtons);
+
         HSplitContainer mainSplit = new()
         {
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -1390,7 +1399,7 @@ public partial class PolyTextureWorkspace : Control
         bool hasElement = false;
         foreach (PolyTextureElement element in _document.ActiveTexture.Elements)
         {
-            hasElement |= element is CenterStrokeElement;
+            hasElement |= element.Enabled;
         }
         foreach (PolyTextureGuide guide in _document.ActiveTexture.Guides)
         {
@@ -1563,7 +1572,7 @@ public partial class PolyTextureWorkspace : Control
     {
         if (!CanBeginMirrorCreation())
         {
-            SetStatus("Create a stroke or path and an axis guide before generating a mirror.");
+            SetStatus("Create an element and an axis guide before applying Mirror.");
             return;
         }
 
@@ -1578,13 +1587,14 @@ public partial class PolyTextureWorkspace : Control
         _canvasView.SetElementSelectionMode(true);
         _canvasView.SetGuideSelectionMode(false);
         RefreshElementActionBar();
-        SetStatus("Mirror: select a source stroke or path.");
+        SetStatus("Mirror: select a source or generated element.");
     }
 
     private void SelectMirrorSource(string elementId)
     {
         PolyTextureItem texture = _document?.ActiveTexture;
-        if (texture?.GetElement(elementId) is not CenterStrokeElement element || _mirrorCreationState != MirrorCreationState.AwaitSource)
+        PolyTextureElement element = texture?.GetElement(elementId);
+        if (element == null || element is MirrorGeneratorElement || _mirrorCreationState != MirrorCreationState.AwaitSource)
         {
             return;
         }
@@ -1654,7 +1664,7 @@ public partial class PolyTextureWorkspace : Control
             _canvasView.SetElementSelectionMode(true);
             _canvasView.SetMirrorDraft(_mirrorDraft);
             RefreshElementActionBar();
-            SetStatus("Mirror: select another source stroke or path.");
+            SetStatus("Mirror: select another source or generated element.");
             return;
         }
 
@@ -1885,6 +1895,12 @@ public partial class PolyTextureWorkspace : Control
             return;
         }
 
+        if (_document?.SelectionKind == PolyTextureSelectionKind.Output)
+        {
+            DeleteActiveOutput();
+            return;
+        }
+
         if (_document?.SelectionKind == PolyTextureSelectionKind.Element)
         {
             DeleteActiveElement();
@@ -1957,6 +1973,67 @@ public partial class PolyTextureWorkspace : Control
         _canvasView.SelectPoint(-1);
         RefreshAll();
         MarkChanged("Element deleted.");
+    }
+
+    private void DeleteActiveOutput()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureOutputBinding output = _document?.ActiveOutput;
+        if (texture == null || output == null)
+        {
+            SetStatus("No output selected.");
+            return;
+        }
+
+        texture.Outputs.Remove(output);
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectionKind = PolyTextureSelectionKind.Texture;
+        RefreshAll();
+        MarkChanged("Output deleted.");
+    }
+
+    private void AddOutput(PolyTextureOutputKind kind)
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        if (texture == null)
+        {
+            SetStatus("Create a texture before adding an output.");
+            return;
+        }
+        if (kind == PolyTextureOutputKind.Height && texture.Outputs.Exists(output => output.Kind == PolyTextureOutputKind.Height))
+        {
+            SetStatus("This texture already has a Height output.");
+            return;
+        }
+
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        PolyTextureOutputBinding binding = new()
+        {
+            Id = EnsureUniqueOutputId(texture, kind == PolyTextureOutputKind.Height ? "height" : "mask"),
+            Name = kind == PolyTextureOutputKind.Height ? "Height" : $"Mask {texture.Outputs.FindAll(output => output.Kind == PolyTextureOutputKind.Mask).Count + 1}",
+            Kind = kind
+        };
+        foreach (PolyTextureElement element in texture.Elements)
+        {
+            if (element.Enabled && !evaluation.HiddenSourceIds.Contains(element.Id) && evaluation.GetGeometry(element.Id).Count > 0)
+            {
+                binding.SourceElementIds.Add(element.Id);
+            }
+        }
+        if (binding.SourceElementIds.Count == 0)
+        {
+            SetStatus("The visible graph has no geometry to bind.");
+            return;
+        }
+
+        texture.Outputs.Add(binding);
+        _document.ActiveOutputId = binding.Id;
+        _document.ActiveElementId = string.Empty;
+        _document.ActiveGuideId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Output;
+        RefreshAll();
+        MarkChanged($"{binding.Name} output added.");
     }
 
     private void FitView()
@@ -2034,6 +2111,18 @@ public partial class PolyTextureWorkspace : Control
         while (GuideIdExists(texture, candidate))
         {
             candidate = $"{sanitizedBaseId}{suffix:00}";
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private static string EnsureUniqueOutputId(PolyTextureItem texture, string baseId)
+    {
+        string candidate = baseId;
+        int suffix = 2;
+        while (texture.GetOutput(candidate) != null)
+        {
+            candidate = $"{baseId}_{suffix}";
             suffix++;
         }
         return candidate;
@@ -2224,6 +2313,7 @@ public partial class PolyTextureWorkspace : Control
                 TreeItem generatorsGroup = CreateOutlinerGroup(textureItem, "Generators");
                 TreeItem operatorsGroup = CreateOutlinerGroup(textureItem, "Operators");
                 TreeItem guidesGroup = CreateOutlinerGroup(textureItem, "Guides");
+                TreeItem outputsGroup = CreateOutlinerGroup(textureItem, "Outputs");
                 foreach (PolyTextureElement element in texture.Elements)
                 {
                     TreeItem parent = generatorsGroup;
@@ -2311,6 +2401,27 @@ public partial class PolyTextureWorkspace : Control
                     {
                         _outlinerTree.SetSelected(guideItem, 1);
                     }
+                }
+
+                foreach (PolyTextureOutputBinding output in texture.Outputs)
+                {
+                    TreeItem outputItem = _outlinerTree.CreateItem(outputsGroup);
+                    if (outputItem == null)
+                    {
+                        continue;
+                    }
+                    outputItem.SetSelectable(0, false);
+                    outputItem.SetText(1, $"{(output.Kind == PolyTextureOutputKind.Height ? "Height" : "Mask")}: {output.Name}");
+                    outputItem.SetSelectable(1, true);
+                    outputItem.SetMetadata(0, $"output|{texture.Id}|{output.Id}");
+                    outputItem.SetMetadata(1, $"output|{texture.Id}|{output.Id}");
+                    if (_document.SelectionKind == PolyTextureSelectionKind.Output
+                        && texture.Id.Equals(_document.ActiveTextureId, StringComparison.Ordinal)
+                        && output.Id.Equals(_document.ActiveOutputId, StringComparison.Ordinal))
+                    {
+                        _outlinerTree.SetSelected(outputItem, 1);
+                    }
+                    AddGeneratorInfoItem(outputItem, $"Sources: {string.Join(", ", output.SourceElementIds)}");
                 }
             }
         }
@@ -2413,10 +2524,21 @@ public partial class PolyTextureWorkspace : Control
         _document.ActiveTextureId = texture.Id;
         _document.ActiveElementId = texture.Elements.Count > 0 ? texture.Elements[0].Id : string.Empty;
         _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
         _document.SelectedPointIndex = -1;
         _document.SelectionKind = PolyTextureSelectionKind.Texture;
 
-        if (parts[0] == "guide" && parts.Length >= 3)
+        if (parts[0] == "output" && parts.Length >= 3)
+        {
+            PolyTextureOutputBinding output = texture.GetOutput(parts[2]);
+            if (output != null)
+            {
+                _document.ActiveElementId = string.Empty;
+                _document.ActiveOutputId = output.Id;
+                _document.SelectionKind = PolyTextureSelectionKind.Output;
+            }
+        }
+        else if (parts[0] == "guide" && parts.Length >= 3)
         {
             PolyTextureGuide guide = texture.GetGuide(parts[2]);
             if (guide != null)
@@ -2457,7 +2579,7 @@ public partial class PolyTextureWorkspace : Control
         }
         else if (_mirrorCreationState == MirrorCreationState.AwaitSource
             && _document.SelectionKind == PolyTextureSelectionKind.Element
-            && _document.ActiveElement is CenterStrokeElement mirrorSource)
+            && _document.ActiveElement is PolyTextureElement mirrorSource)
         {
             SelectMirrorSource(mirrorSource.Id);
         }

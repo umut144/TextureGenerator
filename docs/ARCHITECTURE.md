@@ -57,6 +57,12 @@ References use stable IDs, never display names. Graph validation rejects
 missing inputs, incompatible port types, and cycles before evaluation. Renaming
 does not rewrite references because identity does not change.
 
+Operations are evaluated in document order. An operation may only reference a
+preceding element, which gives the current stack UI deterministic dependency
+order without a separate node editor. Mirror accepts evaluated geometry from a
+Source or Generator; its result can therefore continue a live chain such as
+`side vein -> Sweep -> Mirror`.
+
 Initial port types are `PointSet`, `PathSet`, `RegionSet`, `InstanceSet`,
 `ScalarField`, and `ColorField`.
 
