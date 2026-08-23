@@ -10,6 +10,7 @@ public partial class PolyTextureTestRunner : SceneTree
     public override void _Initialize()
     {
         Run("schema 1 is the only accepted document contract", TestSchemaContract);
+        Run("save filename follows the document name", TestDocumentSaveFileName);
         Run("document round trip preserves names and references", TestRoundTrip);
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
@@ -72,6 +73,12 @@ public partial class PolyTextureTestRunner : SceneTree
         string unsupported = json.Replace("\"schema_version\": 1", "\"schema_version\": 4", StringComparison.Ordinal);
         Assert(!PolyTextureValidator.ValidateJson(unsupported, out string error), "unsupported schema should be rejected");
         Assert(error.Contains("must be 1", StringComparison.Ordinal), "schema diagnostic should name the accepted version");
+    }
+
+    private static void TestDocumentSaveFileName()
+    {
+        Equal("egg_ghost.polytexture.json", PolyTextureWorkspace.BuildDefaultDocumentFileName("Egg Ghost"), "named document filename");
+        Equal("untitled.polytexture.json", PolyTextureWorkspace.BuildDefaultDocumentFileName("   "), "empty document filename");
     }
 
     private static void TestRoundTrip()

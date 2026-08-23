@@ -1073,7 +1073,9 @@ public partial class PolyTextureWorkspace : Control
 
     private void OpenSaveAsDialog()
     {
-        string path = string.IsNullOrEmpty(_documentPath) ? DefaultDocumentPath : GlobalizeDocumentPath(_documentPath);
+        string path = string.IsNullOrEmpty(_documentPath)
+            ? DefaultSaveDirectory.PathJoin(BuildDefaultDocumentFileName(_document?.Name))
+            : GlobalizeDocumentPath(_documentPath);
         _saveAsDialog.CurrentDir = path.GetBaseDir();
         _saveAsDialog.CurrentFile = path.GetFile();
         _saveAsDialog.PopupCenteredRatio(0.6f);
@@ -1084,6 +1086,16 @@ public partial class PolyTextureWorkspace : Control
         return path.StartsWith("res://", StringComparison.Ordinal) || path.StartsWith("user://", StringComparison.Ordinal)
             ? ProjectSettings.GlobalizePath(path)
             : path;
+    }
+
+    public static string BuildDefaultDocumentFileName(string documentName)
+    {
+        if (string.IsNullOrWhiteSpace(documentName))
+        {
+            return "untitled.polytexture.json";
+        }
+        string id = SanitizeId(documentName ?? string.Empty);
+        return $"{(string.IsNullOrWhiteSpace(id) ? "untitled" : id)}.polytexture.json";
     }
 
     private void LoadDocumentFromPath(string path)
