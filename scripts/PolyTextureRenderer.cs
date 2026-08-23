@@ -239,6 +239,24 @@ public static class PolyTextureRenderer
         return result;
     }
 
+    public static List<List<Vector2>> ClipPolygonsToDomain(List<List<Vector2>> polygons, float widthCm, float heightCm)
+    {
+        List<List<Vector2>> clipped = new();
+        foreach (List<Vector2> polygon in polygons)
+        {
+            List<Vector2> result = new(polygon);
+            result = ClipAgainstBoundary(result, point => point.X >= 0.0f, (start, end) => IntersectVertical(start, end, 0.0f));
+            result = ClipAgainstBoundary(result, point => point.X <= widthCm, (start, end) => IntersectVertical(start, end, widthCm));
+            result = ClipAgainstBoundary(result, point => point.Y >= 0.0f, (start, end) => IntersectHorizontal(start, end, 0.0f));
+            result = ClipAgainstBoundary(result, point => point.Y <= heightCm, (start, end) => IntersectHorizontal(start, end, heightCm));
+            if (result.Count >= 3)
+            {
+                clipped.Add(result);
+            }
+        }
+        return clipped;
+    }
+
     public static CenterStrokeElement BuildMirrorElement(PolyTextureItem texture, MirrorGeneratorElement mirror)
     {
         if (texture == null || mirror == null || !mirror.Enabled)
@@ -287,6 +305,46 @@ public static class PolyTextureRenderer
         instance.Transform.LengthScale = source.Transform.LengthScale * Mathf.Lerp(sweep.LengthScaleStart, sweep.LengthScaleEnd, instanceT);
         instance.Transform.WidthScale = source.Transform.WidthScale * Mathf.Lerp(sweep.WidthScaleStart, sweep.WidthScaleEnd, instanceT);
         instances.Add(instance);
+    }
+
+    private static List<Vector2> ClipAgainstBoundary(List<Vector2> polygon, System.Func<Vector2, bool> isInside, System.Func<Vector2, Vector2, Vector2> intersection)
+    {
+        List<Vector2> result = new();
+        if (polygon.Count == 0)
+        {
+            return result;
+        }
+        Vector2 previous = polygon[^1];
+        bool previousInside = isInside(previous);
+        foreach (Vector2 current in polygon)
+        {
+            bool currentInside = isInside(current);
+            if (currentInside != previousInside)
+            {
+                result.Add(intersection(previous, current));
+            }
+            if (currentInside)
+            {
+                result.Add(current);
+            }
+            previous = current;
+            previousInside = currentInside;
+        }
+        return result;
+    }
+
+    private static Vector2 IntersectVertical(Vector2 start, Vector2 end, float x)
+    {
+        float delta = end.X - start.X;
+        float t = Mathf.Abs(delta) < 0.000001f ? 0.0f : (x - start.X) / delta;
+        return new Vector2(x, Mathf.Lerp(start.Y, end.Y, t));
+    }
+
+    private static Vector2 IntersectHorizontal(Vector2 start, Vector2 end, float y)
+    {
+        float delta = end.Y - start.Y;
+        float t = Mathf.Abs(delta) < 0.000001f ? 0.0f : (y - start.Y) / delta;
+        return new Vector2(Mathf.Lerp(start.X, end.X, t), y);
     }
 
     private static void AddRoundedCorner(List<Vector2> polygon, RectangleRegionElement region, Vector2 center, float radius, float startDegrees)

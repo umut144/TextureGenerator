@@ -195,9 +195,18 @@ public partial class PolyTextureTestRunner : SceneTree
         PolyTextureEvaluationResult second = PolyTextureEvaluator.Evaluate(texture);
         Equal(6, first.GetGeometry(repeat.Id).Count, "repeat instance count");
         Equal(first.GetGeometry(repeat.Id).Count, second.GetGeometry(repeat.Id).Count, "repeat deterministic count");
-        Vector2 firstPoint = first.GetGeometry(repeat.Id)[0][0];
-        Vector2 staggeredPoint = first.GetGeometry(repeat.Id)[3][0];
+        List<List<Vector2>> rawGrid = PolyTextureRenderer.BuildRepeatGridPolygons(first.GetGeometry("brick"), repeat);
+        Vector2 firstPoint = rawGrid[0][0];
+        Vector2 staggeredPoint = rawGrid[3][0];
         Near(firstPoint + new Vector2(repeat.AlternateRowOffsetXCm, repeat.StepYCm), staggeredPoint, 0.0001f, "staggered row offset");
+        foreach (List<Vector2> polygon in first.GetGeometry(repeat.Id))
+        {
+            foreach (Vector2 point in polygon)
+            {
+                Assert(point.X >= 0.0f && point.X <= texture.DomainWidthCm
+                    && point.Y >= 0.0f && point.Y <= texture.DomainHeightCm, "repeat geometry must be clipped to the surface domain");
+            }
+        }
         Assert(first.HiddenSourceIds.Contains("brick"), "repeat should replace source preview");
         Assert(PolyTextureValidator.Validate(document, out string error), error);
 

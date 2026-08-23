@@ -78,6 +78,8 @@ are always derived by the evaluator.
 `Repeat Grid` consumes preceding evaluated region geometry and produces a
 deterministic grid of translated instances. Signed alternate-row offset is a
 general parameter; a half-step offset is merely the brick-wall configuration.
+Generated polygons are clipped to the physical Surface Domain before preview
+or bake consumers receive them.
 
 `Invert` is the first `ScalarField` Filter. It evaluates its preceding input at
 bake resolution and returns the exact scalar complement. The source vector

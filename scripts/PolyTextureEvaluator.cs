@@ -47,6 +47,7 @@ public static class PolyTextureEvaluator
             {
                 result.HiddenSourceIds.Add(repeat.SourceElementId);
                 List<List<Vector2>> polygons = PolyTextureRenderer.BuildRepeatGridPolygons(result.GetGeometry(repeat.SourceElementId), repeat);
+                polygons = PolyTextureRenderer.ClipPolygonsToDomain(polygons, texture.DomainWidthCm, texture.DomainHeightCm);
                 result.GeometryByElementId[repeat.Id] = polygons;
                 result.LiveRepeatGrids.Add(repeat);
             }
