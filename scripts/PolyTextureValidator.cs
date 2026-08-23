@@ -223,6 +223,14 @@ public static class PolyTextureValidator
                         return false;
                     }
                 }
+                else if (element is EdgeFalloffFilterElement falloff)
+                {
+                    if (!evaluatedElementIds.Contains(falloff.SourceElementId))
+                    {
+                        error = $"{path}.elements[{element.Id}] must reference a preceding field source";
+                        return false;
+                    }
+                }
                 evaluatedElementIds.Add(element.Id);
             }
         }
@@ -310,6 +318,15 @@ public static class PolyTextureValidator
         if (element is InvertFilterElement invert && string.IsNullOrWhiteSpace(invert.SourceElementId))
         {
             error = $"{path}.source_element_id is required";
+            return false;
+        }
+
+        if (element is EdgeFalloffFilterElement falloff
+            && (string.IsNullOrWhiteSpace(falloff.SourceElementId)
+                || !float.IsFinite(falloff.RadiusCm) || falloff.RadiusCm < 0.0f
+                || !float.IsFinite(falloff.Exponent) || falloff.Exponent <= 0.0f))
+        {
+            error = $"{path} contains invalid edge falloff values";
             return false;
         }
 
@@ -648,6 +665,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(EdgeFalloffFilterElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateEdgeFalloffDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateMirrorDictionary(element, elementPath, out error))
@@ -880,6 +904,26 @@ public static class PolyTextureValidator
         if (string.IsNullOrWhiteSpace(sourceId) || !float.IsFinite(opacity) || opacity < 0.0f || opacity > 1.0f)
         {
             error = $"{path} contains invalid invert filter values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateEdgeFalloffDictionary(Godot.Collections.Dictionary falloff, string path, out string error)
+    {
+        if (!RequireBool(falloff, "enabled", out _, out error, path)
+            || !RequireNumber(falloff, "opacity", out float opacity, out error, path)
+            || !RequireString(falloff, "source_element_id", out string sourceId, out error, path)
+            || !RequireNumber(falloff, "radius_cm", out float radius, out error, path)
+            || !RequireNumber(falloff, "exponent", out float exponent, out error, path))
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(sourceId) || opacity < 0.0f || opacity > 1.0f
+            || !float.IsFinite(radius) || radius < 0.0f
+            || !float.IsFinite(exponent) || exponent <= 0.0f)
+        {
+            error = $"{path} contains invalid edge falloff values";
             return false;
         }
         return true;

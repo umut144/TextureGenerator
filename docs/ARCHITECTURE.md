@@ -95,6 +95,11 @@ or bake consumers receive them.
 bake resolution and returns the exact scalar complement. The source vector
 graph remains canonical and unchanged.
 
+`Edge Falloff` converts a preceding scalar field into a resolution-independent
+inward edge gradient. Radius is authored in centimeters and converted using
+the Surface Domain texel spacing at evaluation time; Exponent controls the
+gradient curve without changing canonical vector geometry.
+
 ## Format policy
 
 The procedural document format starts at schema 1. Unsupported schema versions

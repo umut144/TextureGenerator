@@ -157,6 +157,10 @@ public static class PolyTextureStore
         {
             AppendInvert(builder, invert, indent, suffix);
         }
+        else if (element is EdgeFalloffFilterElement falloff)
+        {
+            AppendEdgeFalloff(builder, falloff, indent, suffix);
+        }
         else if (element is SweepGeneratorElement sweep)
         {
             AppendSweep(builder, sweep, indent, suffix);
@@ -184,6 +188,20 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"enabled\": {JsonBool(invert.Enabled)},");
         builder.AppendLine($"{indent}  \"opacity\": {Number(invert.Opacity)},");
         builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(invert.SourceElementId)}\"");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendEdgeFalloff(StringBuilder builder, EdgeFalloffFilterElement falloff, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(falloff.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(falloff.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{EdgeFalloffFilterElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(falloff.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(falloff.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(falloff.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"radius_cm\": {Number(falloff.RadiusCm)},");
+        builder.AppendLine($"{indent}  \"exponent\": {Number(falloff.Exponent)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
 
@@ -467,6 +485,11 @@ public static class PolyTextureStore
             return ReadInvert(element);
         }
 
+        if (type.Equals(EdgeFalloffFilterElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadEdgeFalloff(element);
+        }
+
         if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadMirror(element);
@@ -487,6 +510,20 @@ public static class PolyTextureStore
             Enabled = ReadBool(invert, "enabled", true),
             Opacity = ReadFloat(invert, "opacity", 0.86f),
             SourceElementId = ReadString(invert, "source_element_id", string.Empty)
+        };
+    }
+
+    private static EdgeFalloffFilterElement ReadEdgeFalloff(Godot.Collections.Dictionary falloff)
+    {
+        return new EdgeFalloffFilterElement
+        {
+            Id = ReadString(falloff, "id", "edge_falloff"),
+            Name = ReadString(falloff, "name", "Edge Falloff"),
+            Enabled = ReadBool(falloff, "enabled", true),
+            Opacity = ReadFloat(falloff, "opacity", 0.86f),
+            SourceElementId = ReadString(falloff, "source_element_id", string.Empty),
+            RadiusCm = ReadFloat(falloff, "radius_cm", 3.0f),
+            Exponent = ReadFloat(falloff, "exponent", 1.0f)
         };
     }
 

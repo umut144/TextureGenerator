@@ -40,6 +40,7 @@ public partial class PolyTextureWorkspace : Control
     private const int GenerateBranchMenuId = 3;
     private const int OperatorMirrorMenuId = 1;
     private const int FilterInvertMenuId = 1;
+    private const int FilterEdgeFalloffMenuId = 2;
     private const int GuidePointMenuId = 1;
     private const int GuideAxisMenuId = 2;
     private const int RectangleRegionMenuId = 3;
@@ -370,6 +371,7 @@ public partial class PolyTextureWorkspace : Control
         _filterMenuButton = new MenuButton { Text = "Filter" };
         PopupMenu filterPopup = _filterMenuButton.GetPopup();
         filterPopup.AddItem("Invert", FilterInvertMenuId);
+        filterPopup.AddItem("Edge Falloff", FilterEdgeFalloffMenuId);
         filterPopup.IdPressed += OnFilterMenuPressed;
         _filterMenuButton.Disabled = true;
         toolbar.AddChild(_filterMenuButton);
@@ -1483,6 +1485,36 @@ public partial class PolyTextureWorkspace : Control
         {
             AddInvertFilter();
         }
+        else if ((int)id == FilterEdgeFalloffMenuId)
+        {
+            AddEdgeFalloffFilter();
+        }
+    }
+
+    private void AddEdgeFalloffFilter()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureElement source = _document?.ActiveElement;
+        if (texture == null || source == null)
+        {
+            SetStatus("Select a source or operation before adding Edge Falloff.");
+            return;
+        }
+        EdgeFalloffFilterElement falloff = new()
+        {
+            Id = EnsureUniqueElementId(texture, "edge_falloff"),
+            Name = "Edge Falloff",
+            SourceElementId = source.Id,
+            RadiusCm = Mathf.Max(0.01f, Mathf.Min(texture.DomainWidthCm, texture.DomainHeightCm) * 0.0075f)
+        };
+        texture.Elements.Add(falloff);
+        _document.ActiveElementId = falloff.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Edge Falloff filter added.");
     }
 
     private void AddInvertFilter()
@@ -2312,9 +2344,9 @@ public partial class PolyTextureWorkspace : Control
             Name = kind == PolyTextureOutputKind.Height ? "Height" : $"Mask {texture.Outputs.FindAll(output => output.Kind == PolyTextureOutputKind.Mask).Count + 1}",
             Kind = kind
         };
-        if (_document.ActiveElement is InvertFilterElement activeFilter)
+        if (_document.ActiveElement is InvertFilterElement or EdgeFalloffFilterElement)
         {
-            binding.SourceElementIds.Add(activeFilter.Id);
+            binding.SourceElementIds.Add(_document.ActiveElement.Id);
         }
         else foreach (PolyTextureElement element in texture.Elements)
         {
@@ -2630,7 +2662,7 @@ public partial class PolyTextureWorkspace : Control
                     {
                         parent = operatorsGroup;
                     }
-                    else if (element is InvertFilterElement)
+                    else if (element is InvertFilterElement or EdgeFalloffFilterElement)
                     {
                         parent = filtersGroup;
                     }
@@ -2704,6 +2736,11 @@ public partial class PolyTextureWorkspace : Control
                     else if (element is InvertFilterElement invert)
                     {
                         AddGeneratorInfoItem(elementItem, $"Source: {invert.SourceElementId}");
+                    }
+                    else if (element is EdgeFalloffFilterElement falloff)
+                    {
+                        AddGeneratorInfoItem(elementItem, $"Source: {falloff.SourceElementId}");
+                        AddGeneratorInfoItem(elementItem, $"Radius: {falloff.RadiusCm:0.##} cm");
                     }
                 }
 

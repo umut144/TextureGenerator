@@ -15,6 +15,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _repeatInspector;
     private VBoxContainer _branchInspector;
     private VBoxContainer _filterInspector;
+    private VBoxContainer _edgeFalloffInspector;
 
     private LineEdit _textureNameLineEdit;
     private OptionButton _textureOriginOptionButton;
@@ -101,6 +102,9 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _branchIrregularitySpinBox;
     private CheckBox _branchRenderSourceCheckBox;
     private Label _filterSourceLabel;
+    private Label _edgeFalloffSourceLabel;
+    private SpinBox _edgeFalloffRadiusSpinBox;
+    private SpinBox _edgeFalloffExponentSpinBox;
 
     public event Action DocumentChanged;
 
@@ -137,6 +141,7 @@ public partial class PolyTextureInspector : PanelContainer
         RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
         BranchGeneratorElement branch = selectedElement as BranchGeneratorElement;
         InvertFilterElement invert = selectedElement as InvertFilterElement;
+        EdgeFalloffFilterElement edgeFalloff = selectedElement as EdgeFalloffFilterElement;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
         _elementInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element;
@@ -147,6 +152,7 @@ public partial class PolyTextureInspector : PanelContainer
         _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
         _branchInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && branch != null;
         _filterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && invert != null;
+        _edgeFalloffInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && edgeFalloff != null;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
         _domainWidthSpinBox.Editable = hasTexture;
@@ -340,6 +346,12 @@ public partial class PolyTextureInspector : PanelContainer
         if (invert != null)
         {
             _filterSourceLabel.Text = invert.SourceElementId;
+        }
+        if (edgeFalloff != null)
+        {
+            _edgeFalloffSourceLabel.Text = edgeFalloff.SourceElementId;
+            _edgeFalloffRadiusSpinBox.Value = edgeFalloff.RadiusCm;
+            _edgeFalloffExponentSpinBox.Value = edgeFalloff.Exponent;
         }
 
         _refreshing = false;
@@ -664,6 +676,16 @@ public partial class PolyTextureInspector : PanelContainer
         _filterInspector = CreateSection(stack, "Invert Filter");
         _filterSourceLabel = new Label();
         AddField(_filterInspector, "Source", _filterSourceLabel);
+
+        _edgeFalloffInspector = CreateSection(stack, "Edge Falloff Filter");
+        _edgeFalloffSourceLabel = new Label();
+        AddField(_edgeFalloffInspector, "Source", _edgeFalloffSourceLabel);
+        _edgeFalloffRadiusSpinBox = CreateSpinBox(0, 100000, 0.01);
+        AddField(_edgeFalloffInspector, "Radius (cm)", _edgeFalloffRadiusSpinBox);
+        _edgeFalloffRadiusSpinBox.ValueChanged += value => ApplyEdgeFalloffChange(falloff => falloff.RadiusCm = (float)value);
+        _edgeFalloffExponentSpinBox = CreateSpinBox(0.01, 16, 0.01);
+        AddField(_edgeFalloffInspector, "Exponent", _edgeFalloffExponentSpinBox);
+        _edgeFalloffExponentSpinBox.ValueChanged += value => ApplyEdgeFalloffChange(falloff => falloff.Exponent = (float)value);
     }
 
     private static VBoxContainer CreateSection(VBoxContainer stack, string title)
@@ -815,6 +837,17 @@ public partial class PolyTextureInspector : PanelContainer
             return;
         }
         apply(branch);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplyEdgeFalloffChange(Action<EdgeFalloffFilterElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not EdgeFalloffFilterElement falloff)
+        {
+            return;
+        }
+        apply(falloff);
         DocumentChanged?.Invoke();
         Refresh();
     }

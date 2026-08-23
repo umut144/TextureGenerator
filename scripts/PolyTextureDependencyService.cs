@@ -21,6 +21,7 @@ public static class PolyTextureDependencyService
                 RepeatGridGeneratorElement repeat => repeat.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 BranchGeneratorElement branch => branch.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 InvertFilterElement invert => invert.SourceElementId.Equals(elementId, StringComparison.Ordinal),
+                EdgeFalloffFilterElement falloff => falloff.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 _ => false
             };
 

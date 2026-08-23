@@ -24,6 +24,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("height and mask baking is deterministic", TestDeterministicBake);
         Run("normal maps derive only from height", TestNormalDerivation);
         Run("invert filter derives a complementary mortar field", TestInvertMortarField);
+        Run("edge falloff derives a physical crack gradient", TestEdgeFalloff);
         Run("display rename preserves stable references", TestRenamePreservesReferences);
         Run("dependency-aware deletion blocks used inputs", TestDependencyDeletion);
         Run("validator rejects missing generator inputs", TestMissingReferenceValidation);
@@ -406,6 +407,52 @@ public partial class PolyTextureTestRunner : SceneTree
         InvertFilterElement loadedInvert = loaded.Textures[0].GetElement("invert") as InvertFilterElement;
         Assert(loadedInvert != null, "invert filter missing after round trip");
         Equal("repeat", loadedInvert.SourceElementId, "invert source round trip");
+    }
+
+    private static void TestEdgeFalloff()
+    {
+        PolyTextureDocument document = CreateCrackDocument();
+        PolyTextureItem texture = document.Textures[0];
+        EdgeFalloffFilterElement falloff = new()
+        {
+            Id = "soft_cracks",
+            Name = "Soft Cracks",
+            SourceElementId = "branches",
+            RadiusCm = 12.0f,
+            Exponent = 1.4f
+        };
+        texture.Elements.Add(falloff);
+        PolyTextureOutputBinding output = new()
+        {
+            Id = "soft_mask",
+            Name = "Soft Crack Mask",
+            Kind = PolyTextureOutputKind.Mask
+        };
+        output.SourceElementIds.Add(falloff.Id);
+        texture.Outputs.Add(output);
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+
+        Image image = PolyTextureBakeService.BakeScalar(texture, output, 128, 128);
+        bool hasBackground = false;
+        bool hasGradient = false;
+        for (int y = 0; y < image.GetHeight(); y++)
+        {
+            for (int x = 0; x < image.GetWidth(); x++)
+            {
+                float value = image.GetPixel(x, y).R;
+                hasBackground |= value <= 0.0001f;
+                hasGradient |= value > 0.0001f && value < 0.999f;
+            }
+        }
+        Assert(hasBackground && hasGradient, "edge falloff should contain background and a soft physical gradient");
+
+        string path = "user://polytexture_test_edge_falloff.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        EdgeFalloffFilterElement loadedFalloff = loaded.Textures[0].GetElement("soft_cracks") as EdgeFalloffFilterElement;
+        Assert(loadedFalloff != null, "edge falloff missing after round trip");
+        Near(falloff.RadiusCm, loadedFalloff.RadiusCm, 0.0001f, "edge falloff radius round trip");
+        Near(falloff.Exponent, loadedFalloff.Exponent, 0.0001f, "edge falloff exponent round trip");
     }
 
     private static void TestDeterministicBake()

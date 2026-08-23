@@ -79,6 +79,10 @@ public static class PolyTextureEvaluator
             {
                 result.GeometryByElementId[operation.Id] = new List<List<Vector2>>();
             }
+            else if (operation is EdgeFalloffFilterElement)
+            {
+                result.GeometryByElementId[operation.Id] = new List<List<Vector2>>();
+            }
         }
 
         return result;

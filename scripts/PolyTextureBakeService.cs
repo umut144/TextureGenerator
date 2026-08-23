@@ -113,6 +113,11 @@ public static class PolyTextureBakeService
                 }
             }
         }
+        else if (element is EdgeFalloffFilterElement falloff && falloff.Enabled)
+        {
+            Image source = EvaluateElementField(texture, evaluation, falloff.SourceElementId, width, height, activeIds);
+            image = ApplyEdgeFalloff(source, texture, falloff.RadiusCm, falloff.Exponent);
+        }
         else if (element?.Enabled == true)
         {
             foreach (List<Vector2> polygon in evaluation.GetGeometry(elementId))
@@ -122,6 +127,82 @@ public static class PolyTextureBakeService
         }
         activeIds.Remove(elementId);
         return image;
+    }
+
+    private static Image ApplyEdgeFalloff(Image source, PolyTextureItem texture, float radiusCm, float exponent)
+    {
+        int width = source.GetWidth();
+        int height = source.GetHeight();
+        Image result = Image.CreateEmpty(width, height, false, Image.Format.L8);
+        result.Fill(Colors.Black);
+        float radius = Mathf.Max(0.0f, radiusCm);
+        if (radius <= 0.0001f)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    result.SetPixel(x, y, source.GetPixel(x, y));
+                }
+            }
+            return result;
+        }
+
+        float spacingX = texture.DomainWidthCm / Mathf.Max(1, width);
+        float spacingY = texture.DomainHeightCm / Mathf.Max(1, height);
+        float diagonal = Mathf.Sqrt(spacingX * spacingX + spacingY * spacingY);
+        float[] distances = new float[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = y * width + x;
+                if (source.GetPixel(x, y).R <= 0.0001f)
+                {
+                    distances[index] = 0.0f;
+                    continue;
+                }
+                float boundaryDistance = Mathf.Min(
+                    Mathf.Min((x + 0.5f) * spacingX, (width - x - 0.5f) * spacingX),
+                    Mathf.Min((y + 0.5f) * spacingY, (height - y - 0.5f) * spacingY));
+                distances[index] = Mathf.Min(boundaryDistance, radius + diagonal);
+            }
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int index = y * width + x;
+                if (x > 0) distances[index] = Mathf.Min(distances[index], distances[index - 1] + spacingX);
+                if (y > 0) distances[index] = Mathf.Min(distances[index], distances[index - width] + spacingY);
+                if (x > 0 && y > 0) distances[index] = Mathf.Min(distances[index], distances[index - width - 1] + diagonal);
+                if (x + 1 < width && y > 0) distances[index] = Mathf.Min(distances[index], distances[index - width + 1] + diagonal);
+            }
+        }
+        for (int y = height - 1; y >= 0; y--)
+        {
+            for (int x = width - 1; x >= 0; x--)
+            {
+                int index = y * width + x;
+                if (x + 1 < width) distances[index] = Mathf.Min(distances[index], distances[index + 1] + spacingX);
+                if (y + 1 < height) distances[index] = Mathf.Min(distances[index], distances[index + width] + spacingY);
+                if (x + 1 < width && y + 1 < height) distances[index] = Mathf.Min(distances[index], distances[index + width + 1] + diagonal);
+                if (x > 0 && y + 1 < height) distances[index] = Mathf.Min(distances[index], distances[index + width - 1] + diagonal);
+            }
+        }
+
+        float curve = Mathf.Max(0.01f, exponent);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float sourceValue = source.GetPixel(x, y).R;
+                float value = sourceValue * Mathf.Pow(Mathf.Clamp(distances[y * width + x] / radius, 0.0f, 1.0f), curve);
+                result.SetPixel(x, y, new Color(value, value, value));
+            }
+        }
+        return result;
     }
 
     private static void RasterizePolygon(Image image, List<Vector2> polygon, float domainWidthCm, float domainHeightCm, float value)
