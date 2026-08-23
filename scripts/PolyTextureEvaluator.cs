@@ -70,6 +70,26 @@ public static class PolyTextureEvaluator
                 result.GeometryByElementId[branch.Id] = polygons;
                 result.LiveBranches.Add(branch);
             }
+            else if (operation is ScatterGeneratorElement scatter)
+            {
+                result.HiddenSourceIds.Add(scatter.SourceElementId);
+                List<List<Vector2>> bounds = string.IsNullOrEmpty(scatter.BoundsElementId)
+                    ? new List<List<Vector2>>()
+                    : result.GetGeometry(scatter.BoundsElementId);
+                List<List<Vector2>> polygons = PolyTextureRenderer.BuildScatterPolygons(
+                    result.GetGeometry(scatter.SourceElementId),
+                    bounds,
+                    texture.DomainWidthCm,
+                    texture.DomainHeightCm,
+                    scatter);
+                if (scatter.RenderSource)
+                {
+                    polygons.InsertRange(0, result.GetGeometry(scatter.SourceElementId));
+                }
+                polygons = PolyTextureRenderer.ClipPolygonsToDomain(polygons, texture.DomainWidthCm, texture.DomainHeightCm);
+                result.GeometryByElementId[scatter.Id] = polygons;
+                result.LiveScatters.Add(scatter);
+            }
             else if (operation is MirrorGeneratorElement mirror)
             {
                 result.HiddenSourceIds.Add(mirror.SourceElementId);

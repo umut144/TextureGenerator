@@ -215,6 +215,15 @@ public static class PolyTextureValidator
                         return false;
                     }
                 }
+                else if (element is ScatterGeneratorElement scatter)
+                {
+                    if (!evaluatedElementIds.Contains(scatter.SourceElementId)
+                        || !string.IsNullOrEmpty(scatter.BoundsElementId) && !evaluatedElementIds.Contains(scatter.BoundsElementId))
+                    {
+                        error = $"{path}.elements[{element.Id}] must reference a preceding prototype and optional bounds";
+                        return false;
+                    }
+                }
                 else if (element is InvertFilterElement invert)
                 {
                     if (!evaluatedElementIds.Contains(invert.SourceElementId))
@@ -316,6 +325,11 @@ public static class PolyTextureValidator
         }
 
         if (element is BranchGeneratorElement branch && !ValidateBranch(branch, path, out error))
+        {
+            return false;
+        }
+
+        if (element is ScatterGeneratorElement scatter && !ValidateScatter(scatter, path, out error))
         {
             return false;
         }
@@ -433,6 +447,25 @@ public static class PolyTextureValidator
             || !float.IsFinite(branch.DepthLengthScale) || branch.DepthLengthScale <= 0.0f || branch.DepthLengthScale > 1.0f)
         {
             error = $"{path} contains invalid branch generator values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateScatter(ScatterGeneratorElement scatter, string path, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(scatter.SourceElementId)
+            || scatter.Seed < 0 || scatter.Count < 1 || scatter.Count > 16384
+            || scatter.ClusterCount < 0 || scatter.ClusterCount > 1024
+            || !float.IsFinite(scatter.ClusterStrength) || scatter.ClusterStrength < 0.0f || scatter.ClusterStrength > 1.0f
+            || !float.IsFinite(scatter.ClusterRadiusCm) || scatter.ClusterRadiusCm < 0.0f
+            || !float.IsFinite(scatter.ScaleMin) || !float.IsFinite(scatter.ScaleMax)
+            || scatter.ScaleMin <= 0.0f || scatter.ScaleMax < scatter.ScaleMin
+            || !float.IsFinite(scatter.RotationMinDegrees) || !float.IsFinite(scatter.RotationMaxDegrees)
+            || scatter.RotationMaxDegrees < scatter.RotationMinDegrees)
+        {
+            error = $"{path} contains invalid scatter generator values";
             return false;
         }
         return true;
@@ -700,6 +733,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(ScatterGeneratorElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateScatterDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateInvertDictionary(element, elementPath, out error))
@@ -957,6 +997,38 @@ public static class PolyTextureValidator
             || !float.IsFinite(depthLengthScale) || depthLengthScale <= 0.0f || depthLengthScale > 1.0f)
         {
             error = $"{path} contains invalid branch generator values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateScatterDictionary(Godot.Collections.Dictionary scatter, string path, out string error)
+    {
+        if (!RequireBool(scatter, "enabled", out _, out error, path)
+            || !RequireNumber(scatter, "opacity", out float opacity, out error, path)
+            || !RequireString(scatter, "source_element_id", out string sourceId, out error, path)
+            || !RequireString(scatter, "bounds_element_id", out _, out error, path)
+            || !RequireInt(scatter, "seed", out int seed, out error, path)
+            || !RequireInt(scatter, "count", out int count, out error, path)
+            || !RequireInt(scatter, "cluster_count", out int clusterCount, out error, path)
+            || !RequireNumber(scatter, "cluster_strength", out float clusterStrength, out error, path)
+            || !RequireNumber(scatter, "cluster_radius_cm", out float clusterRadius, out error, path)
+            || !RequireNumber(scatter, "scale_min", out float scaleMin, out error, path)
+            || !RequireNumber(scatter, "scale_max", out float scaleMax, out error, path)
+            || !RequireNumber(scatter, "rotation_min_degrees", out float rotationMin, out error, path)
+            || !RequireNumber(scatter, "rotation_max_degrees", out float rotationMax, out error, path)
+            || !RequireBool(scatter, "render_source", out _, out error, path))
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(sourceId) || opacity < 0.0f || opacity > 1.0f
+            || seed < 0 || count < 1 || count > 16384 || clusterCount < 0 || clusterCount > 1024
+            || !float.IsFinite(clusterStrength) || clusterStrength < 0.0f || clusterStrength > 1.0f
+            || !float.IsFinite(clusterRadius) || clusterRadius < 0.0f
+            || !float.IsFinite(scaleMin) || !float.IsFinite(scaleMax) || scaleMin <= 0.0f || scaleMax < scaleMin
+            || !float.IsFinite(rotationMin) || !float.IsFinite(rotationMax) || rotationMax < rotationMin)
+        {
+            error = $"{path} contains invalid scatter generator values";
             return false;
         }
         return true;

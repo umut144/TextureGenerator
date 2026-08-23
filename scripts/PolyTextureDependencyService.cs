@@ -20,6 +20,8 @@ public static class PolyTextureDependencyService
                 MirrorGeneratorElement mirror => mirror.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 RepeatGridGeneratorElement repeat => repeat.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 BranchGeneratorElement branch => branch.SourceElementId.Equals(elementId, StringComparison.Ordinal),
+                ScatterGeneratorElement scatter => scatter.SourceElementId.Equals(elementId, StringComparison.Ordinal)
+                    || scatter.BoundsElementId.Equals(elementId, StringComparison.Ordinal),
                 InvertFilterElement invert => invert.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 EdgeFalloffFilterElement falloff => falloff.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 _ => false

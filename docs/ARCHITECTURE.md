@@ -114,6 +114,12 @@ general parameter; a half-step offset is merely the brick-wall configuration.
 Generated polygons are clipped to the physical Surface Domain before preview
 or bake consumers receive them.
 
+`Scatter` consumes evaluated prototype regions and emits deterministic,
+transformed instances. Distribution uses either the physical Surface Domain or
+an optional preceding region as bounds. Seed, count, cluster count, cluster
+strength, physical cluster radius, scale range, and rotation range are
+canonical; sampled positions and instance polygons remain derived data.
+
 `Invert` is the first `ScalarField` Filter. It evaluates its preceding input at
 bake resolution and returns the exact scalar complement. The source vector
 graph remains canonical and unchanged.

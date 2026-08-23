@@ -444,6 +444,15 @@ public partial class PolyTextureCanvasView : Control
             }
         }
 
+        foreach (ScatterGeneratorElement scatter in evaluation.LiveScatters)
+        {
+            bool operationActive = active && scatter == _document.ActiveElement;
+            if (!evaluation.HiddenSourceIds.Contains(scatter.Id) || operationActive)
+            {
+                DrawRegionPreview(evaluation.GetGeometry(scatter.Id), scatter.Opacity, operationActive);
+            }
+        }
+
         foreach (MirrorGeneratorElement mirror in evaluation.LiveMirrors)
         {
             bool operationActive = active && mirror == _document.ActiveElement;

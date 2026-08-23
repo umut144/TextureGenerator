@@ -157,6 +157,10 @@ public static class PolyTextureStore
         {
             AppendBranch(builder, branch, indent, suffix);
         }
+        else if (element is ScatterGeneratorElement scatter)
+        {
+            AppendScatter(builder, scatter, indent, suffix);
+        }
         else if (element is InvertFilterElement invert)
         {
             AppendInvert(builder, invert, indent, suffix);
@@ -250,6 +254,29 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"irregularity\": {Number(branch.Irregularity)},");
         builder.AppendLine($"{indent}  \"depth_length_scale\": {Number(branch.DepthLengthScale)},");
         builder.AppendLine($"{indent}  \"render_source\": {JsonBool(branch.RenderSource)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendScatter(StringBuilder builder, ScatterGeneratorElement scatter, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(scatter.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(scatter.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{ScatterGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(scatter.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(scatter.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(scatter.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"bounds_element_id\": \"{EscapeJson(scatter.BoundsElementId)}\",");
+        builder.AppendLine($"{indent}  \"seed\": {scatter.Seed},");
+        builder.AppendLine($"{indent}  \"count\": {scatter.Count},");
+        builder.AppendLine($"{indent}  \"cluster_count\": {scatter.ClusterCount},");
+        builder.AppendLine($"{indent}  \"cluster_strength\": {Number(scatter.ClusterStrength)},");
+        builder.AppendLine($"{indent}  \"cluster_radius_cm\": {Number(scatter.ClusterRadiusCm)},");
+        builder.AppendLine($"{indent}  \"scale_min\": {Number(scatter.ScaleMin)},");
+        builder.AppendLine($"{indent}  \"scale_max\": {Number(scatter.ScaleMax)},");
+        builder.AppendLine($"{indent}  \"rotation_min_degrees\": {Number(scatter.RotationMinDegrees)},");
+        builder.AppendLine($"{indent}  \"rotation_max_degrees\": {Number(scatter.RotationMaxDegrees)},");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(scatter.RenderSource)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
 
@@ -507,6 +534,11 @@ public static class PolyTextureStore
             return ReadBranch(element);
         }
 
+        if (type.Equals(ScatterGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadScatter(element);
+        }
+
         if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadInvert(element);
@@ -595,6 +627,29 @@ public static class PolyTextureStore
             Irregularity = ReadFloat(branch, "irregularity", 0.25f),
             DepthLengthScale = ReadFloat(branch, "depth_length_scale", 0.55f),
             RenderSource = ReadBool(branch, "render_source", true)
+        };
+    }
+
+    private static ScatterGeneratorElement ReadScatter(Godot.Collections.Dictionary scatter)
+    {
+        return new ScatterGeneratorElement
+        {
+            Id = ReadString(scatter, "id", "scatter"),
+            Name = ReadString(scatter, "name", "Scatter"),
+            Enabled = ReadBool(scatter, "enabled", true),
+            Opacity = ReadFloat(scatter, "opacity", 0.86f),
+            SourceElementId = ReadString(scatter, "source_element_id", string.Empty),
+            BoundsElementId = ReadString(scatter, "bounds_element_id", string.Empty),
+            Seed = ReadInt(scatter, "seed", 1),
+            Count = ReadInt(scatter, "count", 64),
+            ClusterCount = ReadInt(scatter, "cluster_count", 6),
+            ClusterStrength = ReadFloat(scatter, "cluster_strength", 0.8f),
+            ClusterRadiusCm = ReadFloat(scatter, "cluster_radius_cm", 48.0f),
+            ScaleMin = ReadFloat(scatter, "scale_min", 0.35f),
+            ScaleMax = ReadFloat(scatter, "scale_max", 1.4f),
+            RotationMinDegrees = ReadFloat(scatter, "rotation_min_degrees", -180.0f),
+            RotationMaxDegrees = ReadFloat(scatter, "rotation_max_degrees", 180.0f),
+            RenderSource = ReadBool(scatter, "render_source", false)
         };
     }
 

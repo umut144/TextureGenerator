@@ -395,6 +395,65 @@ public static class PolyTextureRenderer
         return polygons;
     }
 
+    public static List<List<Vector2>> BuildScatterPolygons(
+        List<List<Vector2>> sourcePolygons,
+        List<List<Vector2>> boundsPolygons,
+        float domainWidthCm,
+        float domainHeightCm,
+        ScatterGeneratorElement scatter)
+    {
+        List<List<Vector2>> result = new();
+        if (scatter == null || !scatter.Enabled || scatter.Count < 1 || sourcePolygons.Count == 0
+            || domainWidthCm <= 0.0f || domainHeightCm <= 0.0f)
+        {
+            return result;
+        }
+
+        Rect2 sourceBounds = GetPolygonBounds(sourcePolygons, new Rect2(Vector2.Zero, Vector2.One));
+        Vector2 pivot = sourceBounds.Position + sourceBounds.Size * 0.5f;
+        Rect2 sampleBounds = boundsPolygons.Count > 0
+            ? GetPolygonBounds(boundsPolygons, new Rect2(Vector2.Zero, new Vector2(domainWidthCm, domainHeightCm)))
+            : new Rect2(Vector2.Zero, new Vector2(domainWidthCm, domainHeightCm));
+        uint randomState = unchecked((uint)scatter.Seed) ^ 0x85EBCA6Bu;
+        List<Vector2> clusterCenters = new();
+        for (int index = 0; index < scatter.ClusterCount; index++)
+        {
+            if (TrySampleUniformPoint(sampleBounds, boundsPolygons, ref randomState, out Vector2 center))
+            {
+                clusterCenters.Add(center);
+            }
+        }
+
+        for (int instanceIndex = 0; instanceIndex < scatter.Count; instanceIndex++)
+        {
+            Vector2 position;
+            bool useCluster = clusterCenters.Count > 0 && NextRandom(ref randomState) < scatter.ClusterStrength;
+            bool sampled = useCluster
+                ? TrySampleClusterPoint(clusterCenters, scatter.ClusterRadiusCm, sampleBounds, boundsPolygons, ref randomState, out position)
+                : TrySampleUniformPoint(sampleBounds, boundsPolygons, ref randomState, out position);
+            if (!sampled && !TrySampleUniformPoint(sampleBounds, boundsPolygons, ref randomState, out position))
+            {
+                continue;
+            }
+
+            float scale = Mathf.Lerp(scatter.ScaleMin, scatter.ScaleMax, NextRandom(ref randomState));
+            float rotation = Mathf.DegToRad(Mathf.Lerp(scatter.RotationMinDegrees, scatter.RotationMaxDegrees, NextRandom(ref randomState)));
+            foreach (List<Vector2> sourcePolygon in sourcePolygons)
+            {
+                List<Vector2> instance = new(sourcePolygon.Count);
+                foreach (Vector2 point in sourcePolygon)
+                {
+                    instance.Add(position + ((point - pivot) * scale).Rotated(rotation));
+                }
+                if (instance.Count >= 3)
+                {
+                    result.Add(instance);
+                }
+            }
+        }
+        return result;
+    }
+
     public static List<List<Vector2>> ClipPolygonsToDomain(List<List<Vector2>> polygons, float widthCm, float heightCm)
     {
         List<List<Vector2>> clipped = new();
@@ -471,6 +530,79 @@ public static class PolyTextureRenderer
             lengths.Add(lengths[^1] + path[index - 1].DistanceTo(path[index]));
         }
         return lengths;
+    }
+
+    private static Rect2 GetPolygonBounds(List<List<Vector2>> polygons, Rect2 fallback)
+    {
+        Vector2 minimum = new(float.MaxValue, float.MaxValue);
+        Vector2 maximum = new(float.MinValue, float.MinValue);
+        bool hasPoint = false;
+        foreach (List<Vector2> polygon in polygons)
+        {
+            foreach (Vector2 point in polygon)
+            {
+                minimum = new Vector2(Mathf.Min(minimum.X, point.X), Mathf.Min(minimum.Y, point.Y));
+                maximum = new Vector2(Mathf.Max(maximum.X, point.X), Mathf.Max(maximum.Y, point.Y));
+                hasPoint = true;
+            }
+        }
+        return hasPoint ? new Rect2(minimum, maximum - minimum) : fallback;
+    }
+
+    private static bool TrySampleUniformPoint(Rect2 bounds, List<List<Vector2>> boundsPolygons, ref uint randomState, out Vector2 point)
+    {
+        for (int attempt = 0; attempt < 128; attempt++)
+        {
+            point = bounds.Position + new Vector2(NextRandom(ref randomState) * bounds.Size.X, NextRandom(ref randomState) * bounds.Size.Y);
+            if (boundsPolygons.Count == 0 || IsPointInAnyPolygon(point, boundsPolygons))
+            {
+                return true;
+            }
+        }
+        point = Vector2.Zero;
+        return false;
+    }
+
+    private static bool TrySampleClusterPoint(List<Vector2> centers, float radiusCm, Rect2 bounds, List<List<Vector2>> boundsPolygons, ref uint randomState, out Vector2 point)
+    {
+        for (int attempt = 0; attempt < 64; attempt++)
+        {
+            int centerIndex = Mathf.Min(centers.Count - 1, Mathf.FloorToInt(NextRandom(ref randomState) * centers.Count));
+            float angle = NextRandom(ref randomState) * Mathf.Tau;
+            float distance = Mathf.Sqrt(NextRandom(ref randomState)) * Mathf.Max(0.0f, radiusCm);
+            point = centers[centerIndex] + Vector2.Right.Rotated(angle) * distance;
+            if (bounds.HasPoint(point) && (boundsPolygons.Count == 0 || IsPointInAnyPolygon(point, boundsPolygons)))
+            {
+                return true;
+            }
+        }
+        point = Vector2.Zero;
+        return false;
+    }
+
+    private static bool IsPointInAnyPolygon(Vector2 point, List<List<Vector2>> polygons)
+    {
+        foreach (List<Vector2> polygon in polygons)
+        {
+            bool inside = false;
+            for (int index = 0, previous = polygon.Count - 1; index < polygon.Count; previous = index++)
+            {
+                Vector2 currentPoint = polygon[index];
+                Vector2 previousPoint = polygon[previous];
+                bool crosses = (currentPoint.Y > point.Y) != (previousPoint.Y > point.Y)
+                    && point.X < (previousPoint.X - currentPoint.X) * (point.Y - currentPoint.Y)
+                        / (previousPoint.Y - currentPoint.Y) + currentPoint.X;
+                if (crosses)
+                {
+                    inside = !inside;
+                }
+            }
+            if (inside)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void SamplePolyline(List<Vector2> path, List<float> cumulativeLengths, float totalLength, float t, out Vector2 position, out Vector2 tangent)

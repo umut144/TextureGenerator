@@ -15,6 +15,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _ellipseInspector;
     private VBoxContainer _repeatInspector;
     private VBoxContainer _branchInspector;
+    private VBoxContainer _scatterInspector;
     private VBoxContainer _filterInspector;
     private VBoxContainer _edgeFalloffInspector;
 
@@ -110,6 +111,18 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _branchIrregularitySpinBox;
     private SpinBox _branchDepthLengthScaleSpinBox;
     private CheckBox _branchRenderSourceCheckBox;
+    private Label _scatterSourceLabel;
+    private OptionButton _scatterBoundsOptionButton;
+    private SpinBox _scatterSeedSpinBox;
+    private SpinBox _scatterCountSpinBox;
+    private SpinBox _scatterClusterCountSpinBox;
+    private SpinBox _scatterClusterStrengthSpinBox;
+    private SpinBox _scatterClusterRadiusSpinBox;
+    private SpinBox _scatterScaleMinSpinBox;
+    private SpinBox _scatterScaleMaxSpinBox;
+    private SpinBox _scatterRotationMinSpinBox;
+    private SpinBox _scatterRotationMaxSpinBox;
+    private CheckBox _scatterRenderSourceCheckBox;
     private Label _filterSourceLabel;
     private Label _edgeFalloffSourceLabel;
     private SpinBox _edgeFalloffRadiusSpinBox;
@@ -150,6 +163,7 @@ public partial class PolyTextureInspector : PanelContainer
         EllipseRegionElement ellipse = selectedElement as EllipseRegionElement;
         RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
         BranchGeneratorElement branch = selectedElement as BranchGeneratorElement;
+        ScatterGeneratorElement scatter = selectedElement as ScatterGeneratorElement;
         InvertFilterElement invert = selectedElement as InvertFilterElement;
         EdgeFalloffFilterElement edgeFalloff = selectedElement as EdgeFalloffFilterElement;
 
@@ -162,6 +176,7 @@ public partial class PolyTextureInspector : PanelContainer
         _ellipseInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && ellipse != null;
         _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
         _branchInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && branch != null;
+        _scatterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && scatter != null;
         _filterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && invert != null;
         _edgeFalloffInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && edgeFalloff != null;
         _textureNameLineEdit.Editable = hasTexture;
@@ -365,6 +380,21 @@ public partial class PolyTextureInspector : PanelContainer
             _branchIrregularitySpinBox.Value = branch.Irregularity;
             _branchDepthLengthScaleSpinBox.Value = branch.DepthLengthScale;
             _branchRenderSourceCheckBox.ButtonPressed = branch.RenderSource;
+        }
+        if (scatter != null)
+        {
+            _scatterSourceLabel.Text = scatter.SourceElementId;
+            RefreshScatterBoundsOptions(scatter);
+            _scatterSeedSpinBox.Value = scatter.Seed;
+            _scatterCountSpinBox.Value = scatter.Count;
+            _scatterClusterCountSpinBox.Value = scatter.ClusterCount;
+            _scatterClusterStrengthSpinBox.Value = scatter.ClusterStrength;
+            _scatterClusterRadiusSpinBox.Value = scatter.ClusterRadiusCm;
+            _scatterScaleMinSpinBox.Value = scatter.ScaleMin;
+            _scatterScaleMaxSpinBox.Value = scatter.ScaleMax;
+            _scatterRotationMinSpinBox.Value = scatter.RotationMinDegrees;
+            _scatterRotationMaxSpinBox.Value = scatter.RotationMaxDegrees;
+            _scatterRenderSourceCheckBox.ButtonPressed = scatter.RenderSource;
         }
         if (invert != null)
         {
@@ -722,6 +752,44 @@ public partial class PolyTextureInspector : PanelContainer
         _branchRenderSourceCheckBox.Toggled += value => ApplyBranchChange(branch => branch.RenderSource = value);
         _branchInspector.AddChild(_branchRenderSourceCheckBox);
 
+        _scatterInspector = CreateSection(stack, "Scatter");
+        _scatterSourceLabel = new Label();
+        AddField(_scatterInspector, "Prototype", _scatterSourceLabel);
+        _scatterBoundsOptionButton = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        AddField(_scatterInspector, "Bounds", _scatterBoundsOptionButton);
+        _scatterBoundsOptionButton.ItemSelected += index => ApplyScatterChange(scatter =>
+            scatter.BoundsElementId = (int)index == 0 ? string.Empty : _scatterBoundsOptionButton.GetItemText((int)index));
+        _scatterSeedSpinBox = CreateSpinBox(0, int.MaxValue, 1);
+        AddField(_scatterInspector, "Seed", _scatterSeedSpinBox);
+        _scatterSeedSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.Seed = (int)value);
+        _scatterCountSpinBox = CreateSpinBox(1, 16384, 1);
+        AddField(_scatterInspector, "Count", _scatterCountSpinBox);
+        _scatterCountSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.Count = (int)value);
+        _scatterClusterCountSpinBox = CreateSpinBox(0, 1024, 1);
+        AddField(_scatterInspector, "Cluster Count", _scatterClusterCountSpinBox);
+        _scatterClusterCountSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.ClusterCount = (int)value);
+        _scatterClusterStrengthSpinBox = CreateSpinBox(0, 1, 0.1);
+        AddField(_scatterInspector, "Cluster Strength", _scatterClusterStrengthSpinBox);
+        _scatterClusterStrengthSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.ClusterStrength = (float)value);
+        _scatterClusterRadiusSpinBox = CreateSpinBox(0, 100000, 0.1);
+        AddField(_scatterInspector, "Cluster Radius (cm)", _scatterClusterRadiusSpinBox);
+        _scatterClusterRadiusSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.ClusterRadiusCm = (float)value);
+        _scatterScaleMinSpinBox = CreateSpinBox(0.01, 100, 0.1);
+        AddField(_scatterInspector, "Scale Min", _scatterScaleMinSpinBox);
+        _scatterScaleMinSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.ScaleMin = Mathf.Min((float)value, scatter.ScaleMax));
+        _scatterScaleMaxSpinBox = CreateSpinBox(0.01, 100, 0.1);
+        AddField(_scatterInspector, "Scale Max", _scatterScaleMaxSpinBox);
+        _scatterScaleMaxSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.ScaleMax = Mathf.Max((float)value, scatter.ScaleMin));
+        _scatterRotationMinSpinBox = CreateSpinBox(-3600, 3600, 0.1);
+        AddField(_scatterInspector, "Rotation Min", _scatterRotationMinSpinBox);
+        _scatterRotationMinSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.RotationMinDegrees = Mathf.Min((float)value, scatter.RotationMaxDegrees));
+        _scatterRotationMaxSpinBox = CreateSpinBox(-3600, 3600, 0.1);
+        AddField(_scatterInspector, "Rotation Max", _scatterRotationMaxSpinBox);
+        _scatterRotationMaxSpinBox.ValueChanged += value => ApplyScatterChange(scatter => scatter.RotationMaxDegrees = Mathf.Max((float)value, scatter.RotationMinDegrees));
+        _scatterRenderSourceCheckBox = new CheckBox { Text = "Render Prototype" };
+        _scatterRenderSourceCheckBox.Toggled += value => ApplyScatterChange(scatter => scatter.RenderSource = value);
+        _scatterInspector.AddChild(_scatterRenderSourceCheckBox);
+
         _filterInspector = CreateSection(stack, "Invert Filter");
         _filterSourceLabel = new Label();
         AddField(_filterInspector, "Source", _filterSourceLabel);
@@ -905,6 +973,46 @@ public partial class PolyTextureInspector : PanelContainer
         apply(branch);
         DocumentChanged?.Invoke();
         Refresh();
+    }
+
+    private void ApplyScatterChange(Action<ScatterGeneratorElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not ScatterGeneratorElement scatter)
+        {
+            return;
+        }
+        apply(scatter);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void RefreshScatterBoundsOptions(ScatterGeneratorElement scatter)
+    {
+        _scatterBoundsOptionButton.Clear();
+        _scatterBoundsOptionButton.AddItem("Surface Domain");
+        int selectedIndex = 0;
+        PolyTextureItem texture = _document.ActiveTexture;
+        foreach (PolyTextureElement candidate in texture.Elements)
+        {
+            if (candidate.Id.Equals(scatter.Id, StringComparison.Ordinal))
+            {
+                break;
+            }
+            if (candidate.Id.Equals(scatter.SourceElementId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (candidate is InvertFilterElement or EdgeFalloffFilterElement)
+            {
+                continue;
+            }
+            _scatterBoundsOptionButton.AddItem(candidate.Id);
+            if (candidate.Id.Equals(scatter.BoundsElementId, StringComparison.Ordinal))
+            {
+                selectedIndex = _scatterBoundsOptionButton.ItemCount - 1;
+            }
+        }
+        _scatterBoundsOptionButton.Selected = selectedIndex;
     }
 
     private void ApplyEdgeFalloffChange(Action<EdgeFalloffFilterElement> apply)

@@ -38,6 +38,7 @@ public partial class PolyTextureWorkspace : Control
     private const int GenerateSweepMenuId = 1;
     private const int GenerateRepeatGridMenuId = 2;
     private const int GenerateBranchMenuId = 3;
+    private const int GenerateScatterMenuId = 4;
     private const int OperatorMirrorMenuId = 1;
     private const int FilterInvertMenuId = 1;
     private const int FilterEdgeFalloffMenuId = 2;
@@ -373,6 +374,7 @@ public partial class PolyTextureWorkspace : Control
         generatePopup.AddItem("Sweep", GenerateSweepMenuId);
         generatePopup.AddItem("Repeat Grid", GenerateRepeatGridMenuId);
         generatePopup.AddItem("Branch", GenerateBranchMenuId);
+        generatePopup.AddItem("Scatter", GenerateScatterMenuId);
         generatePopup.IdPressed += OnGenerateMenuPressed;
         _generateMenuButton.Disabled = true;
         toolbar.AddChild(_generateMenuButton);
@@ -1437,6 +1439,43 @@ public partial class PolyTextureWorkspace : Control
         {
             AddBranch();
         }
+        else if ((int)id == GenerateScatterMenuId)
+        {
+            AddScatter();
+        }
+    }
+
+    private void AddScatter()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureElement source = _document?.ActiveElement;
+        if (texture == null || source == null)
+        {
+            SetStatus("Select a region prototype before adding Scatter.");
+            return;
+        }
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        if (evaluation.GetGeometry(source.Id).Count == 0)
+        {
+            SetStatus("The selected element has no scatterable region geometry.");
+            return;
+        }
+        float domainScale = Mathf.Min(texture.DomainWidthCm, texture.DomainHeightCm);
+        ScatterGeneratorElement scatter = new()
+        {
+            Id = EnsureUniqueElementId(texture, "scatter"),
+            Name = "Scatter",
+            SourceElementId = source.Id,
+            ClusterRadiusCm = Mathf.Max(0.01f, domainScale * 0.12f)
+        };
+        texture.Elements.Add(scatter);
+        _document.ActiveElementId = scatter.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Scatter generator added.");
     }
 
     private void AddBranch()
@@ -2843,6 +2882,12 @@ public partial class PolyTextureWorkspace : Control
                         AddGeneratorInfoItem(elementItem, $"Branches: {branch.Count}");
                         AddGeneratorInfoItem(elementItem, $"Depth: {branch.Depth}");
                         AddGeneratorInfoItem(elementItem, $"Seed: {branch.Seed}");
+                    }
+                    else if (element is ScatterGeneratorElement scatter)
+                    {
+                        AddGeneratorInfoItem(elementItem, $"Prototype: {scatter.SourceElementId}");
+                        AddGeneratorInfoItem(elementItem, $"Bounds: {(string.IsNullOrEmpty(scatter.BoundsElementId) ? "Surface Domain" : scatter.BoundsElementId)}");
+                        AddGeneratorInfoItem(elementItem, $"Instances: {scatter.Count}");
                     }
                     else if (element is MirrorGeneratorElement mirror)
                     {

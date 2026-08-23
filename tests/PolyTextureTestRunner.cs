@@ -22,6 +22,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("point multi-selection preserves a primary point", TestPointMultiSelection);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
+        Run("scatter produces deterministic clustered regions", TestScatterGenerator);
         Run("branch generator produces deterministic crack structures", TestBranchGenerator);
         Run("branch generator recursively grows crack generations", TestRecursiveBranchGenerator);
         Run("evaluator keeps operations live", TestLiveEvaluation);
@@ -392,6 +393,59 @@ public partial class PolyTextureTestRunner : SceneTree
             }
         }
         Assert(hasCrack, "branch mask bake should contain crack structure");
+    }
+
+    private static void TestScatterGenerator()
+    {
+        PolyTextureDocument document = CreateScatterDocument();
+        PolyTextureItem texture = document.Textures[0];
+        ScatterGeneratorElement scatter = texture.GetElement("scatter") as ScatterGeneratorElement;
+        Assert(scatter != null, "scatter generator missing");
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+
+        PolyTextureEvaluationResult first = PolyTextureEvaluator.Evaluate(texture);
+        PolyTextureEvaluationResult second = PolyTextureEvaluator.Evaluate(texture);
+        Equal(scatter.Count, first.GetGeometry(scatter.Id).Count, "scatter instance count");
+        Equal(first.GetGeometry(scatter.Id).Count, second.GetGeometry(scatter.Id).Count, "scatter deterministic count");
+        Near(first.GetGeometry(scatter.Id)[0][0], second.GetGeometry(scatter.Id)[0][0], 0.0001f, "scatter deterministic geometry");
+        foreach (List<Vector2> polygon in first.GetGeometry(scatter.Id))
+        {
+            Vector2 center = Vector2.Zero;
+            foreach (Vector2 point in polygon)
+            {
+                center += point;
+            }
+            center /= polygon.Count;
+            Vector2 normalized = (center - new Vector2(200.0f, 200.0f)) / new Vector2(150.0f, 120.0f);
+            Assert(normalized.LengthSquared() <= 1.01f, "scatter center must remain inside ellipse bounds");
+        }
+        Assert(first.HiddenSourceIds.Contains("colony"), "scatter should hide its prototype");
+
+        Vector2 clusteredPoint = first.GetGeometry(scatter.Id)[0][0];
+        scatter.ClusterStrength = 0.0f;
+        Vector2 uniformPoint = PolyTextureEvaluator.Evaluate(texture).GetGeometry(scatter.Id)[0][0];
+        Assert(clusteredPoint.DistanceTo(uniformPoint) > 0.001f, "cluster strength must affect distribution");
+        scatter.ClusterStrength = 1.0f;
+
+        string path = "user://polytexture_test_scatter.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        ScatterGeneratorElement loadedScatter = loaded.Textures[0].GetElement("scatter") as ScatterGeneratorElement;
+        Assert(loadedScatter != null, "scatter missing after round trip");
+        Equal(scatter.BoundsElementId, loadedScatter.BoundsElementId, "scatter bounds round trip");
+        Equal(scatter.ClusterCount, loadedScatter.ClusterCount, "scatter cluster count round trip");
+        Near(scatter.ScaleMax, loadedScatter.ScaleMax, 0.0001f, "scatter scale round trip");
+
+        Image mask = PolyTextureBakeService.BakeScalar(texture, texture.GetOutput("mold_mask"), 96, 96);
+        bool hasMold = false;
+        for (int y = 0; y < mask.GetHeight() && !hasMold; y++)
+        {
+            for (int x = 0; x < mask.GetWidth(); x++)
+            {
+                hasMold |= mask.GetPixel(x, y).R > 0.5f;
+            }
+        }
+        Assert(hasMold, "scatter mask bake should contain colonies");
     }
 
     private static void TestRecursiveBranchGenerator()
@@ -849,6 +903,61 @@ public partial class PolyTextureTestRunner : SceneTree
             Kind = PolyTextureOutputKind.Mask
         };
         mask.SourceElementIds.Add(branches.Id);
+        texture.Outputs.Add(mask);
+        document.Textures.Add(texture);
+        return document;
+    }
+
+    private static PolyTextureDocument CreateScatterDocument()
+    {
+        PolyTextureDocument document = new()
+        {
+            Name = "Mold",
+            ActiveTextureId = "mold",
+            ActiveElementId = "scatter",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "mold", Name = "Mold" };
+        EllipseRegionElement bounds = new()
+        {
+            Id = "tomato_bounds",
+            Name = "Tomato Bounds",
+            Position = new Vector2(200.0f, 200.0f),
+            WidthCm = 300.0f,
+            HeightCm = 240.0f
+        };
+        EllipseRegionElement colony = new()
+        {
+            Id = "colony",
+            Name = "Colony Prototype",
+            Position = new Vector2(40.0f, 40.0f),
+            WidthCm = 18.0f,
+            HeightCm = 12.0f
+        };
+        ScatterGeneratorElement scatter = new()
+        {
+            Id = "scatter",
+            Name = "Mold Scatter",
+            SourceElementId = colony.Id,
+            BoundsElementId = bounds.Id,
+            Seed = 17,
+            Count = 40,
+            ClusterCount = 4,
+            ClusterStrength = 1.0f,
+            ClusterRadiusCm = 35.0f,
+            ScaleMin = 0.4f,
+            ScaleMax = 1.6f
+        };
+        texture.Elements.Add(bounds);
+        texture.Elements.Add(colony);
+        texture.Elements.Add(scatter);
+        PolyTextureOutputBinding mask = new()
+        {
+            Id = "mold_mask",
+            Name = "Mold",
+            Kind = PolyTextureOutputKind.Mask
+        };
+        mask.SourceElementIds.Add(scatter.Id);
         texture.Outputs.Add(mask);
         document.Textures.Add(texture);
         return document;
