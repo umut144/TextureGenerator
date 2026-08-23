@@ -137,7 +137,11 @@ public static class PolyTextureStore
 
     private static void AppendElement(StringBuilder builder, PolyTextureElement element, string indent, string suffix)
     {
-        if (element is MirrorGeneratorElement mirror)
+        if (element is RectangleRegionElement rectangleRegion)
+        {
+            AppendRectangleRegion(builder, rectangleRegion, indent, suffix);
+        }
+        else if (element is MirrorGeneratorElement mirror)
         {
             AppendMirror(builder, mirror, indent, suffix);
         }
@@ -153,6 +157,22 @@ public static class PolyTextureStore
         {
             AppendCenterStroke(builder, centerStroke, includeBezierData: false, indent, suffix);
         }
+    }
+
+    private static void AppendRectangleRegion(StringBuilder builder, RectangleRegionElement region, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(region.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(region.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{RectangleRegionElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(region.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(region.Opacity)},");
+        builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(region.Position.X)}, \"y\": {Number(region.Position.Y)} }},");
+        builder.AppendLine($"{indent}  \"rotation_degrees\": {Number(region.RotationDegrees)},");
+        builder.AppendLine($"{indent}  \"width_cm\": {Number(region.WidthCm)},");
+        builder.AppendLine($"{indent}  \"height_cm\": {Number(region.HeightCm)},");
+        builder.AppendLine($"{indent}  \"corner_radius_cm\": {Number(region.CornerRadiusCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
     }
 
     private static void AppendGuide(StringBuilder builder, PolyTextureGuide guide, string indent, string suffix)
@@ -343,6 +363,11 @@ public static class PolyTextureStore
             return ReadCenterStroke(element, supportsBezierHandles: false);
         }
 
+        if (type.Equals(RectangleRegionElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadRectangleRegion(element);
+        }
+
         if (type.Equals(CenterPathElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadCenterStroke(element, supportsBezierHandles: true);
@@ -361,6 +386,22 @@ public static class PolyTextureStore
         return new CenterStrokeElement
         {
             Id = ReadString(element, "id", "center_stroke01")
+        };
+    }
+
+    private static RectangleRegionElement ReadRectangleRegion(Godot.Collections.Dictionary region)
+    {
+        return new RectangleRegionElement
+        {
+            Id = ReadString(region, "id", "rectangle_region"),
+            Name = ReadString(region, "name", "Rectangle Region"),
+            Enabled = ReadBool(region, "enabled", true),
+            Opacity = ReadFloat(region, "opacity", 0.86f),
+            Position = ReadVector2(region, "position"),
+            RotationDegrees = ReadFloat(region, "rotation_degrees", 0.0f),
+            WidthCm = ReadFloat(region, "width_cm", 80.0f),
+            HeightCm = ReadFloat(region, "height_cm", 40.0f),
+            CornerRadiusCm = ReadFloat(region, "corner_radius_cm", 0.0f)
         };
     }
 

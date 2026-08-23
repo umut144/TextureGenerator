@@ -38,6 +38,7 @@ public partial class PolyTextureWorkspace : Control
     private const int OperatorMirrorMenuId = 1;
     private const int GuidePointMenuId = 1;
     private const int GuideAxisMenuId = 2;
+    private const int RectangleRegionMenuId = 3;
 
     private PolyTextureDocument _document;
     private string _documentPath = string.Empty;
@@ -341,6 +342,7 @@ public partial class PolyTextureWorkspace : Control
         PopupMenu guidePopup = _guideMenuButton.GetPopup();
         guidePopup.AddItem("Guide Point", GuidePointMenuId);
         guidePopup.AddItem("Guide Axis", GuideAxisMenuId);
+        guidePopup.AddItem("Rectangle Region", RectangleRegionMenuId);
         guidePopup.IdPressed += OnGuideMenuPressed;
         toolbar.AddChild(_guideMenuButton);
 
@@ -1363,6 +1365,39 @@ public partial class PolyTextureWorkspace : Control
         {
             BeginGuideDrawing(GuideDrawingState.AxisStart);
         }
+        else if ((int)id == RectangleRegionMenuId)
+        {
+            AddRectangleRegion();
+        }
+    }
+
+    private void AddRectangleRegion()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        if (texture == null)
+        {
+            SetStatus("Select or create a texture before adding a region.");
+            return;
+        }
+
+        float width = Mathf.Min(80.0f, texture.DomainWidthCm);
+        float height = Mathf.Min(40.0f, texture.DomainHeightCm);
+        RectangleRegionElement region = new()
+        {
+            Id = EnsureUniqueElementId(texture, "rectangle_region"),
+            Name = "Rectangle Region",
+            WidthCm = width,
+            HeightCm = height,
+            Position = new Vector2(width * 0.5f, height * 0.5f)
+        };
+        texture.Elements.Add(region);
+        _document.ActiveElementId = region.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Rectangle Region added.");
     }
 
     private void BeginGuideDrawing(GuideDrawingState state)
@@ -2419,7 +2454,7 @@ public partial class PolyTextureWorkspace : Control
                 foreach (PolyTextureElement element in texture.Elements)
                 {
                     TreeItem parent = generatorsGroup;
-                    if (element is CenterStrokeElement)
+                    if (element is CenterStrokeElement or RectangleRegionElement)
                     {
                         parent = elementsGroup;
                     }

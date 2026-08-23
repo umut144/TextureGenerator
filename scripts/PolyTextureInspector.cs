@@ -11,6 +11,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _sweepInspector;
     private VBoxContainer _pointInspector;
     private VBoxContainer _outputInspector;
+    private VBoxContainer _regionInspector;
 
     private LineEdit _textureNameLineEdit;
     private OptionButton _textureOriginOptionButton;
@@ -71,6 +72,12 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _outputValueSpinBox;
     private SpinBox _outputHeightAmplitudeSpinBox;
     private HBoxContainer _outputHeightAmplitudeRow;
+    private SpinBox _regionPositionXSpinBox;
+    private SpinBox _regionPositionYSpinBox;
+    private SpinBox _regionRotationSpinBox;
+    private SpinBox _regionWidthSpinBox;
+    private SpinBox _regionHeightSpinBox;
+    private SpinBox _regionCornerRadiusSpinBox;
 
     public event Action DocumentChanged;
 
@@ -103,12 +110,14 @@ public partial class PolyTextureInspector : PanelContainer
         bool hasTexture = texture != null;
         bool supportsBezierHandles = element?.SupportsBezierHandles == true;
         PolyTextureOutputBinding output = _document.ActiveOutput;
+        RectangleRegionElement region = selectedElement as RectangleRegionElement;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
         _elementInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element;
         _sweepInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && sweep != null;
         _pointInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Point;
         _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
+        _regionInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && region != null;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
         _domainWidthSpinBox.Editable = hasTexture;
@@ -261,6 +270,18 @@ public partial class PolyTextureInspector : PanelContainer
             _outputValueSpinBox.Value = 1.0;
             _outputHeightAmplitudeSpinBox.Value = 1.0;
             _outputHeightAmplitudeRow.Visible = false;
+        }
+
+        if (region != null)
+        {
+            Vector2 displayPosition = ToDisplayPosition(region.Position);
+            _regionPositionXSpinBox.Value = displayPosition.X;
+            _regionPositionYSpinBox.Value = displayPosition.Y;
+            _regionRotationSpinBox.Value = region.RotationDegrees;
+            _regionWidthSpinBox.Value = region.WidthCm;
+            _regionHeightSpinBox.Value = region.HeightCm;
+            _regionCornerRadiusSpinBox.MaxValue = Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f;
+            _regionCornerRadiusSpinBox.Value = region.CornerRadiusCm;
         }
 
         _refreshing = false;
@@ -494,6 +515,34 @@ public partial class PolyTextureInspector : PanelContainer
         _outputHeightAmplitudeSpinBox = CreateSpinBox(0.01, 1000, 0.01);
         _outputHeightAmplitudeRow = AddField(_outputInspector, "Amplitude (cm)", _outputHeightAmplitudeSpinBox);
         _outputHeightAmplitudeSpinBox.ValueChanged += value => ApplyOutputChange(output => output.HeightAmplitudeCm = (float)value);
+
+        _regionInspector = CreateSection(stack, "Rectangle Region");
+        _regionPositionXSpinBox = CreateSpinBox(-100000, 100000, 0.01);
+        AddField(_regionInspector, "Position X (cm)", _regionPositionXSpinBox);
+        _regionPositionXSpinBox.ValueChanged += value => ApplyRegionDisplayPosition(new Vector2((float)value, (float)_regionPositionYSpinBox.Value));
+        _regionPositionYSpinBox = CreateSpinBox(-100000, 100000, 0.01);
+        AddField(_regionInspector, "Position Y (cm)", _regionPositionYSpinBox);
+        _regionPositionYSpinBox.ValueChanged += value => ApplyRegionDisplayPosition(new Vector2((float)_regionPositionXSpinBox.Value, (float)value));
+        _regionRotationSpinBox = CreateSpinBox(-3600, 3600, 0.1);
+        AddField(_regionInspector, "Rotation (deg CCW)", _regionRotationSpinBox);
+        _regionRotationSpinBox.ValueChanged += value => ApplyRegionChange(region => region.RotationDegrees = (float)value);
+        _regionWidthSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_regionInspector, "Width (cm)", _regionWidthSpinBox);
+        _regionWidthSpinBox.ValueChanged += value => ApplyRegionChange(region =>
+        {
+            region.WidthCm = (float)value;
+            region.CornerRadiusCm = Mathf.Min(region.CornerRadiusCm, Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f);
+        });
+        _regionHeightSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_regionInspector, "Height (cm)", _regionHeightSpinBox);
+        _regionHeightSpinBox.ValueChanged += value => ApplyRegionChange(region =>
+        {
+            region.HeightCm = (float)value;
+            region.CornerRadiusCm = Mathf.Min(region.CornerRadiusCm, Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f);
+        });
+        _regionCornerRadiusSpinBox = CreateSpinBox(0, 50000, 0.01);
+        AddField(_regionInspector, "Corner Radius (cm)", _regionCornerRadiusSpinBox);
+        _regionCornerRadiusSpinBox.ValueChanged += value => ApplyRegionChange(region => region.CornerRadiusCm = Mathf.Min((float)value, Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f));
     }
 
     private static VBoxContainer CreateSection(VBoxContainer stack, string title)
@@ -609,6 +658,22 @@ public partial class PolyTextureInspector : PanelContainer
     private void ApplyOutputName(string value)
     {
         ApplyOutputChange(output => output.Name = CleanName(value, output.Name));
+    }
+
+    private void ApplyRegionChange(Action<RectangleRegionElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not RectangleRegionElement region)
+        {
+            return;
+        }
+        apply(region);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplyRegionDisplayPosition(Vector2 displayPosition)
+    {
+        ApplyRegionChange(region => region.Position = ToStoredPosition(displayPosition));
     }
 
     private void ApplyElementName(string value)

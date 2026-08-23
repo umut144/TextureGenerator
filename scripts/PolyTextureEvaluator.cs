@@ -18,7 +18,14 @@ public static class PolyTextureEvaluator
                 continue;
             }
 
-            if (operation is CenterStrokeElement centerStroke)
+            if (operation is RectangleRegionElement rectangleRegion)
+            {
+                List<Vector2> polygon = PolyTextureRenderer.BuildRectangleRegion(rectangleRegion);
+                result.GeometryByElementId[operation.Id] = polygon.Count >= 3
+                    ? new List<List<Vector2>> { polygon }
+                    : new List<List<Vector2>>();
+            }
+            else if (operation is CenterStrokeElement centerStroke)
             {
                 List<Vector2> polygon = PolyTextureRenderer.BuildFilledPolygon(centerStroke);
                 result.GeometryByElementId[operation.Id] = polygon.Count >= 3

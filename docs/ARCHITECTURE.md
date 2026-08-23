@@ -71,6 +71,10 @@ Source or Generator; its result can therefore continue a live chain such as
 Initial port types are `PointSet`, `PathSet`, `RegionSet`, `InstanceSet`,
 `ScalarField`, and `ColorField`.
 
+`Rectangle Region` is the first parametric `RegionSet` Source. Its canonical
+data is position, physical size, rotation, and corner radius; polygon samples
+are always derived by the evaluator.
+
 ## Format policy
 
 The procedural document format starts at schema 1. Unsupported schema versions

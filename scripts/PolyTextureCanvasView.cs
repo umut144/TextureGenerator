@@ -389,7 +389,15 @@ public partial class PolyTextureCanvasView : Control
 
         foreach (PolyTextureElement element in texture.Elements)
         {
-            if (element is CenterStrokeElement centerStroke)
+            if (element is RectangleRegionElement rectangleRegion)
+            {
+                bool elementActive = active && rectangleRegion == _document.ActiveElement;
+                if (!evaluation.HiddenSourceIds.Contains(rectangleRegion.Id) || elementActive)
+                {
+                    DrawRegionPreview(evaluation.GetGeometry(rectangleRegion.Id), rectangleRegion.Opacity, elementActive);
+                }
+            }
+            else if (element is CenterStrokeElement centerStroke)
             {
                 bool elementActive = active && centerStroke == _document.ActiveElement;
                 if (evaluation.HiddenSourceIds.Contains(centerStroke.Id) && !elementActive)
@@ -417,6 +425,29 @@ public partial class PolyTextureCanvasView : Control
             {
                 DrawMirrorPreview(texture, mirror, isDraft: false, polygons: evaluation.GetGeometry(mirror.Id));
             }
+        }
+    }
+
+    private void DrawRegionPreview(List<List<Vector2>> polygons, float opacity, bool active)
+    {
+        Color fillColor = active
+            ? new Color(0.23f, 0.58f, 0.72f, Mathf.Clamp(opacity, 0.0f, 1.0f))
+            : new Color(0.36f, 0.63f, 0.72f, Mathf.Clamp(opacity, 0.0f, 1.0f) * 0.72f);
+        Color outlineColor = active
+            ? new Color(0.08f, 0.28f, 0.42f, 0.9f)
+            : new Color(0.1f, 0.3f, 0.42f, 0.55f);
+        foreach (List<Vector2> polygon in polygons)
+        {
+            Vector2[] screenPolygon = new Vector2[polygon.Count];
+            for (int index = 0; index < polygon.Count; index++)
+            {
+                screenPolygon[index] = DocumentToScreen(polygon[index]);
+            }
+            if (CanFillPolygon(screenPolygon))
+            {
+                DrawColoredPolygon(screenPolygon, fillColor);
+            }
+            DrawPolyline(ClosePolyline(screenPolygon), outlineColor, width: active ? 1.8f : 1.0f);
         }
     }
 
@@ -605,7 +636,29 @@ public partial class PolyTextureCanvasView : Control
 
         for (int elementIndex = texture.Elements.Count - 1; elementIndex >= 0; elementIndex--)
         {
-            if (texture.Elements[elementIndex] is not CenterStrokeElement element || !element.Enabled)
+            PolyTextureElement candidate = texture.Elements[elementIndex];
+            if (!candidate.Enabled)
+            {
+                continue;
+            }
+
+            if (candidate is RectangleRegionElement rectangleRegion)
+            {
+                List<Vector2> regionPolygon = PolyTextureRenderer.BuildRectangleRegion(rectangleRegion);
+                Vector2[] screenRegion = new Vector2[regionPolygon.Count];
+                for (int pointIndex = 0; pointIndex < regionPolygon.Count; pointIndex++)
+                {
+                    screenRegion[pointIndex] = DocumentToScreen(regionPolygon[pointIndex]);
+                }
+                if (screenRegion.Length >= 3 && Geometry2D.IsPointInPolygon(screenPosition, screenRegion))
+                {
+                    elementId = rectangleRegion.Id;
+                    return true;
+                }
+                continue;
+            }
+
+            if (candidate is not CenterStrokeElement element)
             {
                 continue;
             }

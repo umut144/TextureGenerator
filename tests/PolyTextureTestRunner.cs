@@ -13,6 +13,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("document round trip preserves names and references", TestRoundTrip);
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
+        Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
@@ -132,6 +133,41 @@ public partial class PolyTextureTestRunner : SceneTree
             Near(first[index].Transform.Position, second[index].Transform.Position, 0.0001f, $"instance {index} position");
             Near(first[index].Transform.RotationDegrees, second[index].Transform.RotationDegrees, 0.0001f, $"instance {index} rotation");
         }
+    }
+
+    private static void TestRectangleRegionRoundTrip()
+    {
+        PolyTextureDocument document = new()
+        {
+            ActiveTextureId = "wall",
+            ActiveElementId = "brick",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "wall", Name = "Wall" };
+        RectangleRegionElement region = new()
+        {
+            Id = "brick",
+            Name = "Brick Region",
+            Position = new Vector2(50.0f, 30.0f),
+            WidthCm = 80.0f,
+            HeightCm = 40.0f,
+            CornerRadiusCm = 5.0f,
+            RotationDegrees = 12.0f
+        };
+        texture.Elements.Add(region);
+        document.Textures.Add(texture);
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+
+        List<Vector2> polygon = PolyTextureRenderer.BuildRectangleRegion(region);
+        Equal(28, polygon.Count, "rounded rectangle sample count");
+        string path = "user://polytexture_test_rectangle.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        RectangleRegionElement loadedRegion = loaded.Textures[0].GetElement("brick") as RectangleRegionElement;
+        Assert(loadedRegion != null, "rectangle region missing after round trip");
+        Near(region.Position, loadedRegion.Position, 0.0001f, "rectangle position");
+        Near(region.WidthCm, loadedRegion.WidthCm, 0.0001f, "rectangle width");
+        Near(region.CornerRadiusCm, loadedRegion.CornerRadiusCm, 0.0001f, "rectangle radius");
     }
 
     private static void TestLiveEvaluation()

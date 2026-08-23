@@ -4,6 +4,34 @@ using Godot;
 public static class PolyTextureRenderer
 {
     private const int SamplesPerSegment = 16;
+    private const int RoundedCornerSamples = 6;
+
+    public static List<Vector2> BuildRectangleRegion(RectangleRegionElement region)
+    {
+        List<Vector2> polygon = new();
+        if (region == null || !region.Enabled || region.WidthCm <= 0.0f || region.HeightCm <= 0.0f)
+        {
+            return polygon;
+        }
+
+        float halfWidth = region.WidthCm * 0.5f;
+        float halfHeight = region.HeightCm * 0.5f;
+        float radius = Mathf.Clamp(region.CornerRadiusCm, 0.0f, Mathf.Min(halfWidth, halfHeight));
+        if (radius <= 0.0001f)
+        {
+            polygon.Add(TransformRegionPoint(region, new Vector2(halfWidth, halfHeight)));
+            polygon.Add(TransformRegionPoint(region, new Vector2(-halfWidth, halfHeight)));
+            polygon.Add(TransformRegionPoint(region, new Vector2(-halfWidth, -halfHeight)));
+            polygon.Add(TransformRegionPoint(region, new Vector2(halfWidth, -halfHeight)));
+            return polygon;
+        }
+
+        AddRoundedCorner(polygon, region, new Vector2(halfWidth - radius, halfHeight - radius), radius, 0.0f);
+        AddRoundedCorner(polygon, region, new Vector2(-halfWidth + radius, halfHeight - radius), radius, 90.0f);
+        AddRoundedCorner(polygon, region, new Vector2(-halfWidth + radius, -halfHeight + radius), radius, 180.0f);
+        AddRoundedCorner(polygon, region, new Vector2(halfWidth - radius, -halfHeight + radius), radius, 270.0f);
+        return polygon;
+    }
 
     public static List<Vector2> BuildFilledPolygon(CenterStrokeElement element)
     {
@@ -232,6 +260,21 @@ public static class PolyTextureRenderer
         instance.Transform.LengthScale = source.Transform.LengthScale * Mathf.Lerp(sweep.LengthScaleStart, sweep.LengthScaleEnd, instanceT);
         instance.Transform.WidthScale = source.Transform.WidthScale * Mathf.Lerp(sweep.WidthScaleStart, sweep.WidthScaleEnd, instanceT);
         instances.Add(instance);
+    }
+
+    private static void AddRoundedCorner(List<Vector2> polygon, RectangleRegionElement region, Vector2 center, float radius, float startDegrees)
+    {
+        for (int sample = 0; sample <= RoundedCornerSamples; sample++)
+        {
+            float angle = Mathf.DegToRad(startDegrees + sample / (float)RoundedCornerSamples * 90.0f);
+            Vector2 localPoint = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            polygon.Add(TransformRegionPoint(region, localPoint));
+        }
+    }
+
+    private static Vector2 TransformRegionPoint(RectangleRegionElement region, Vector2 localPoint)
+    {
+        return region.Position + localPoint.Rotated(Mathf.DegToRad(region.RotationDegrees));
     }
 
     private static Vector2 ReflectAcrossAxis(Vector2 point, PolyTextureGuide axis)

@@ -262,6 +262,11 @@ public static class PolyTextureValidator
             return false;
         }
 
+        if (element is RectangleRegionElement rectangleRegion && !ValidateRectangleRegion(rectangleRegion, path, out error))
+        {
+            return false;
+        }
+
         if (element is SweepGeneratorElement sweep && !ValidateSweep(sweep, path, out error))
         {
             return false;
@@ -294,6 +299,23 @@ public static class PolyTextureValidator
             || sweep.WidthScaleStart <= 0.0f || sweep.WidthScaleEnd <= 0.0f)
         {
             error = $"{path} sweep scales must be positive";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateRectangleRegion(RectangleRegionElement region, string path, out string error)
+    {
+        error = string.Empty;
+        float maximumRadius = Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f;
+        if (!float.IsFinite(region.Position.X) || !float.IsFinite(region.Position.Y)
+            || !float.IsFinite(region.RotationDegrees)
+            || !float.IsFinite(region.WidthCm) || !float.IsFinite(region.HeightCm)
+            || !float.IsFinite(region.CornerRadiusCm)
+            || region.WidthCm <= 0.0f || region.HeightCm <= 0.0f
+            || region.CornerRadiusCm < 0.0f || region.CornerRadiusCm > maximumRadius)
+        {
+            error = $"{path} contains invalid rectangle region values";
             return false;
         }
         return true;
@@ -513,6 +535,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(RectangleRegionElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateRectangleRegionDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(SweepGeneratorElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateSweepDictionary(element, elementPath, out error))
@@ -657,6 +686,28 @@ public static class PolyTextureValidator
             || lengthStart <= 0.0f || lengthEnd <= 0.0f || widthStart <= 0.0f || widthEnd <= 0.0f)
         {
             error = $"{path} contains invalid sweep values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateRectangleRegionDictionary(Godot.Collections.Dictionary region, string path, out string error)
+    {
+        if (!RequireBool(region, "enabled", out _, out error, path)
+            || !RequireNumber(region, "opacity", out float opacity, out error, path)
+            || !ValidateHandleVector(region, "position", path, out error)
+            || !RequireNumber(region, "rotation_degrees", out float rotation, out error, path)
+            || !RequireNumber(region, "width_cm", out float width, out error, path)
+            || !RequireNumber(region, "height_cm", out float height, out error, path)
+            || !RequireNumber(region, "corner_radius_cm", out float radius, out error, path))
+        {
+            return false;
+        }
+        if (!float.IsFinite(opacity) || opacity < 0.0f || opacity > 1.0f
+            || !float.IsFinite(rotation) || !float.IsFinite(width) || !float.IsFinite(height) || !float.IsFinite(radius)
+            || width <= 0.0f || height <= 0.0f || radius < 0.0f || radius > Mathf.Min(width, height) * 0.5f)
+        {
+            error = $"{path} contains invalid rectangle region values";
             return false;
         }
         return true;
