@@ -427,6 +427,15 @@ public partial class PolyTextureCanvasView : Control
             }
         }
 
+        foreach (BranchGeneratorElement branch in evaluation.LiveBranches)
+        {
+            bool operationActive = active && branch == _document.ActiveElement;
+            if (!evaluation.HiddenSourceIds.Contains(branch.Id) || operationActive)
+            {
+                DrawRegionPreview(evaluation.GetGeometry(branch.Id), branch.Opacity, operationActive);
+            }
+        }
+
         foreach (MirrorGeneratorElement mirror in evaluation.LiveMirrors)
         {
             bool operationActive = active && mirror == _document.ActiveElement;

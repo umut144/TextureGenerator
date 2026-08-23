@@ -149,6 +149,10 @@ public static class PolyTextureStore
         {
             AppendRepeatGrid(builder, repeat, indent, suffix);
         }
+        else if (element is BranchGeneratorElement branch)
+        {
+            AppendBranch(builder, branch, indent, suffix);
+        }
         else if (element is InvertFilterElement invert)
         {
             AppendInvert(builder, invert, indent, suffix);
@@ -197,6 +201,30 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"step_x_cm\": {Number(repeat.StepXCm)},");
         builder.AppendLine($"{indent}  \"step_y_cm\": {Number(repeat.StepYCm)},");
         builder.AppendLine($"{indent}  \"alternate_row_offset_x_cm\": {Number(repeat.AlternateRowOffsetXCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendBranch(StringBuilder builder, BranchGeneratorElement branch, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(branch.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(branch.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{BranchGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(branch.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(branch.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(branch.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"seed\": {branch.Seed},");
+        builder.AppendLine($"{indent}  \"count\": {branch.Count},");
+        builder.AppendLine($"{indent}  \"segments\": {branch.Segments},");
+        builder.AppendLine($"{indent}  \"start_t\": {Number(branch.StartT)},");
+        builder.AppendLine($"{indent}  \"end_t\": {Number(branch.EndT)},");
+        builder.AppendLine($"{indent}  \"length_min_cm\": {Number(branch.LengthMinCm)},");
+        builder.AppendLine($"{indent}  \"length_max_cm\": {Number(branch.LengthMaxCm)},");
+        builder.AppendLine($"{indent}  \"angle_min_degrees\": {Number(branch.AngleMinDegrees)},");
+        builder.AppendLine($"{indent}  \"angle_max_degrees\": {Number(branch.AngleMaxDegrees)},");
+        builder.AppendLine($"{indent}  \"width_scale\": {Number(branch.WidthScale)},");
+        builder.AppendLine($"{indent}  \"irregularity\": {Number(branch.Irregularity)},");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(branch.RenderSource)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
 
@@ -429,6 +457,11 @@ public static class PolyTextureStore
             return ReadRepeatGrid(element);
         }
 
+        if (type.Equals(BranchGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadBranch(element);
+        }
+
         if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadInvert(element);
@@ -471,6 +504,30 @@ public static class PolyTextureStore
             StepXCm = ReadFloat(repeat, "step_x_cm", 1.0f),
             StepYCm = ReadFloat(repeat, "step_y_cm", 1.0f),
             AlternateRowOffsetXCm = ReadFloat(repeat, "alternate_row_offset_x_cm", 0.0f)
+        };
+    }
+
+    private static BranchGeneratorElement ReadBranch(Godot.Collections.Dictionary branch)
+    {
+        return new BranchGeneratorElement
+        {
+            Id = ReadString(branch, "id", "branch"),
+            Name = ReadString(branch, "name", "Branch"),
+            Enabled = ReadBool(branch, "enabled", true),
+            Opacity = ReadFloat(branch, "opacity", 0.86f),
+            SourceElementId = ReadString(branch, "source_element_id", string.Empty),
+            Seed = ReadInt(branch, "seed", 1),
+            Count = ReadInt(branch, "count", 10),
+            Segments = ReadInt(branch, "segments", 3),
+            StartT = ReadFloat(branch, "start_t", 0.08f),
+            EndT = ReadFloat(branch, "end_t", 0.92f),
+            LengthMinCm = ReadFloat(branch, "length_min_cm", 18.0f),
+            LengthMaxCm = ReadFloat(branch, "length_max_cm", 55.0f),
+            AngleMinDegrees = ReadFloat(branch, "angle_min_degrees", 25.0f),
+            AngleMaxDegrees = ReadFloat(branch, "angle_max_degrees", 65.0f),
+            WidthScale = ReadFloat(branch, "width_scale", 0.45f),
+            Irregularity = ReadFloat(branch, "irregularity", 0.25f),
+            RenderSource = ReadBool(branch, "render_source", true)
         };
     }
 

@@ -37,6 +37,7 @@ public partial class PolyTextureWorkspace : Control
     private const int DrawCrackLineMenuId = 4;
     private const int GenerateSweepMenuId = 1;
     private const int GenerateRepeatGridMenuId = 2;
+    private const int GenerateBranchMenuId = 3;
     private const int OperatorMirrorMenuId = 1;
     private const int FilterInvertMenuId = 1;
     private const int GuidePointMenuId = 1;
@@ -354,6 +355,7 @@ public partial class PolyTextureWorkspace : Control
         PopupMenu generatePopup = _generateMenuButton.GetPopup();
         generatePopup.AddItem("Sweep", GenerateSweepMenuId);
         generatePopup.AddItem("Repeat Grid", GenerateRepeatGridMenuId);
+        generatePopup.AddItem("Branch", GenerateBranchMenuId);
         generatePopup.IdPressed += OnGenerateMenuPressed;
         _generateMenuButton.Disabled = true;
         toolbar.AddChild(_generateMenuButton);
@@ -1372,6 +1374,38 @@ public partial class PolyTextureWorkspace : Control
         {
             AddRepeatGrid();
         }
+        else if ((int)id == GenerateBranchMenuId)
+        {
+            AddBranch();
+        }
+    }
+
+    private void AddBranch()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        if (texture == null || _document.ActiveElement is not CrackLineElement source)
+        {
+            SetStatus("Select a Crack Line source before adding Branch.");
+            return;
+        }
+
+        float domainScale = Mathf.Min(texture.DomainWidthCm, texture.DomainHeightCm);
+        BranchGeneratorElement branch = new()
+        {
+            Id = EnsureUniqueElementId(texture, "branch"),
+            Name = "Branch",
+            SourceElementId = source.Id,
+            LengthMinCm = Mathf.Max(0.01f, domainScale * 0.045f),
+            LengthMaxCm = Mathf.Max(0.02f, domainScale * 0.14f)
+        };
+        texture.Elements.Add(branch);
+        _document.ActiveElementId = branch.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Branch generator added.");
     }
 
     private void AddRepeatGrid()
@@ -2655,6 +2689,12 @@ public partial class PolyTextureWorkspace : Control
                         AddGeneratorInfoItem(elementItem, $"Source: {repeat.SourceElementId}");
                         AddGeneratorInfoItem(elementItem, $"Grid: {repeat.Columns} x {repeat.Rows}");
                         AddGeneratorInfoItem(elementItem, $"Step: {repeat.StepXCm:0.##} x {repeat.StepYCm:0.##} cm");
+                    }
+                    else if (element is BranchGeneratorElement branch)
+                    {
+                        AddGeneratorInfoItem(elementItem, $"Source: {branch.SourceElementId}");
+                        AddGeneratorInfoItem(elementItem, $"Branches: {branch.Count}");
+                        AddGeneratorInfoItem(elementItem, $"Seed: {branch.Seed}");
                     }
                     else if (element is MirrorGeneratorElement mirror)
                     {

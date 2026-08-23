@@ -239,6 +239,90 @@ public static class PolyTextureRenderer
         return result;
     }
 
+    public static List<CenterStrokeElement> BuildBranchStrokes(PolyTextureItem texture, BranchGeneratorElement branch)
+    {
+        List<CenterStrokeElement> result = new();
+        if (branch == null || !branch.Enabled || branch.Count < 1 || branch.Segments < 1
+            || texture?.GetElement(branch.SourceElementId) is not CrackLineElement source)
+        {
+            return result;
+        }
+
+        List<Vector2> path = BuildCenterPath(source);
+        if (path.Count < 2)
+        {
+            return result;
+        }
+
+        List<float> cumulativeLengths = BuildCumulativeLengths(path);
+        float totalLength = cumulativeLengths[^1];
+        if (totalLength <= 0.0001f)
+        {
+            return result;
+        }
+
+        float sourceWidth = AverageStrokeWidth(source) * source.Transform.WidthScale;
+        uint randomState = unchecked((uint)branch.Seed) ^ 0x9E3779B9u;
+        for (int branchIndex = 0; branchIndex < branch.Count; branchIndex++)
+        {
+            float cellT = (branchIndex + 0.5f) / branch.Count;
+            float baseT = Mathf.Lerp(branch.StartT, branch.EndT, cellT);
+            float jitterRange = (branch.EndT - branch.StartT) / branch.Count * 0.7f;
+            float t = Mathf.Clamp(baseT + (NextRandom(ref randomState) - 0.5f) * jitterRange, branch.StartT, branch.EndT);
+            SamplePolyline(path, cumulativeLengths, totalLength, t, out Vector2 anchor, out Vector2 tangent);
+
+            float side = NextRandom(ref randomState) < 0.5f ? -1.0f : 1.0f;
+            float angle = Mathf.DegToRad(Mathf.Lerp(branch.AngleMinDegrees, branch.AngleMaxDegrees, NextRandom(ref randomState))) * side;
+            float length = Mathf.Lerp(branch.LengthMinCm, branch.LengthMaxCm, NextRandom(ref randomState));
+            Vector2 direction = tangent.Rotated(angle).Normalized();
+            float segmentLength = length / branch.Segments;
+            CenterStrokeElement stroke = new()
+            {
+                Id = $"{branch.Id}_derived_{branchIndex}",
+                Name = $"{branch.Name} {branchIndex + 1}",
+                Symmetry = true,
+                Opacity = branch.Opacity
+            };
+
+            Vector2 position = anchor;
+            for (int segmentIndex = 0; segmentIndex <= branch.Segments; segmentIndex++)
+            {
+                float normalized = segmentIndex / (float)branch.Segments;
+                float width = Mathf.Max(0.01f, sourceWidth * branch.WidthScale * Mathf.Lerp(1.0f, 0.12f, normalized));
+                stroke.Points.Add(new CenterStrokePoint
+                {
+                    X = position.X,
+                    Y = position.Y,
+                    LeftWidth = width,
+                    RightWidth = width,
+                    HandleMode = PolyTextureHandleMode.Linear
+                });
+                if (segmentIndex < branch.Segments)
+                {
+                    float bendDegrees = (NextRandom(ref randomState) * 2.0f - 1.0f) * branch.Irregularity * 45.0f;
+                    direction = direction.Rotated(Mathf.DegToRad(bendDegrees)).Normalized();
+                    position += direction * segmentLength;
+                }
+            }
+            result.Add(stroke);
+        }
+        return result;
+    }
+
+    public static List<List<Vector2>> BuildBranchPolygons(PolyTextureItem texture, BranchGeneratorElement branch)
+    {
+        List<List<Vector2>> polygons = new();
+        foreach (CenterStrokeElement stroke in BuildBranchStrokes(texture, branch))
+        {
+            List<Vector2> polygon = BuildFilledPolygon(stroke);
+            if (polygon.Count >= 3)
+            {
+                polygons.Add(polygon);
+            }
+        }
+        return polygons;
+    }
+
     public static List<List<Vector2>> ClipPolygonsToDomain(List<List<Vector2>> polygons, float widthCm, float heightCm)
     {
         List<List<Vector2>> clipped = new();
@@ -305,6 +389,53 @@ public static class PolyTextureRenderer
         instance.Transform.LengthScale = source.Transform.LengthScale * Mathf.Lerp(sweep.LengthScaleStart, sweep.LengthScaleEnd, instanceT);
         instance.Transform.WidthScale = source.Transform.WidthScale * Mathf.Lerp(sweep.WidthScaleStart, sweep.WidthScaleEnd, instanceT);
         instances.Add(instance);
+    }
+
+    private static List<float> BuildCumulativeLengths(List<Vector2> path)
+    {
+        List<float> lengths = new(path.Count) { 0.0f };
+        for (int index = 1; index < path.Count; index++)
+        {
+            lengths.Add(lengths[^1] + path[index - 1].DistanceTo(path[index]));
+        }
+        return lengths;
+    }
+
+    private static void SamplePolyline(List<Vector2> path, List<float> cumulativeLengths, float totalLength, float t, out Vector2 position, out Vector2 tangent)
+    {
+        float targetLength = Mathf.Clamp(t, 0.0f, 1.0f) * totalLength;
+        int segmentIndex = 0;
+        while (segmentIndex + 1 < cumulativeLengths.Count - 1 && cumulativeLengths[segmentIndex + 1] < targetLength)
+        {
+            segmentIndex++;
+        }
+        float segmentLength = cumulativeLengths[segmentIndex + 1] - cumulativeLengths[segmentIndex];
+        float segmentT = segmentLength <= 0.0001f ? 0.0f : (targetLength - cumulativeLengths[segmentIndex]) / segmentLength;
+        position = path[segmentIndex].Lerp(path[segmentIndex + 1], segmentT);
+        tangent = path[segmentIndex + 1] - path[segmentIndex];
+        tangent = tangent.LengthSquared() < 0.0001f ? Vector2.Up : tangent.Normalized();
+    }
+
+    private static float AverageStrokeWidth(CenterStrokeElement stroke)
+    {
+        if (stroke.Points.Count == 0)
+        {
+            return 1.0f;
+        }
+        float sum = 0.0f;
+        foreach (CenterStrokePoint point in stroke.Points)
+        {
+            sum += (point.LeftWidth + point.RightWidth) * 0.5f;
+        }
+        return Mathf.Max(0.01f, sum / stroke.Points.Count);
+    }
+
+    private static float NextRandom(ref uint state)
+    {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        return (state & 0x00FFFFFFu) / 16777216.0f;
     }
 
     private static List<Vector2> ClipAgainstBoundary(List<Vector2> polygon, System.Func<Vector2, bool> isInside, System.Func<Vector2, Vector2, Vector2> intersection)

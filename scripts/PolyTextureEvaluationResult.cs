@@ -6,6 +6,7 @@ public sealed class PolyTextureEvaluationResult
     public List<SweepGeneratorElement> LiveSweeps { get; } = new();
     public List<MirrorGeneratorElement> LiveMirrors { get; } = new();
     public List<RepeatGridGeneratorElement> LiveRepeatGrids { get; } = new();
+    public List<BranchGeneratorElement> LiveBranches { get; } = new();
     public Dictionary<string, List<List<Godot.Vector2>>> GeometryByElementId { get; } = new(System.StringComparer.Ordinal);
 
     public List<List<Godot.Vector2>> GetGeometry(string elementId)

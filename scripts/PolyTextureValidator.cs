@@ -206,6 +206,15 @@ public static class PolyTextureValidator
                         return false;
                     }
                 }
+                else if (element is BranchGeneratorElement branch)
+                {
+                    if (texture.GetElement(branch.SourceElementId) is not CrackLineElement
+                        || !evaluatedElementIds.Contains(branch.SourceElementId))
+                    {
+                        error = $"{path}.elements[{element.Id}] must reference a preceding crack line";
+                        return false;
+                    }
+                }
                 else if (element is InvertFilterElement invert)
                 {
                     if (!evaluatedElementIds.Contains(invert.SourceElementId))
@@ -293,6 +302,11 @@ public static class PolyTextureValidator
             return false;
         }
 
+        if (element is BranchGeneratorElement branch && !ValidateBranch(branch, path, out error))
+        {
+            return false;
+        }
+
         if (element is InvertFilterElement invert && string.IsNullOrWhiteSpace(invert.SourceElementId))
         {
             error = $"{path}.source_element_id is required";
@@ -358,6 +372,27 @@ public static class PolyTextureValidator
             || repeat.StepXCm <= 0.0f || repeat.StepYCm <= 0.0f)
         {
             error = $"{path} contains invalid repeat grid values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateBranch(BranchGeneratorElement branch, string path, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(branch.SourceElementId)
+            || branch.Seed < 0 || branch.Count < 1 || branch.Count > 4096
+            || branch.Segments < 1 || branch.Segments > 32
+            || !float.IsFinite(branch.StartT) || !float.IsFinite(branch.EndT)
+            || branch.StartT < 0.0f || branch.EndT > 1.0f || branch.StartT > branch.EndT
+            || !float.IsFinite(branch.LengthMinCm) || !float.IsFinite(branch.LengthMaxCm)
+            || branch.LengthMinCm <= 0.0f || branch.LengthMaxCm < branch.LengthMinCm
+            || !float.IsFinite(branch.AngleMinDegrees) || !float.IsFinite(branch.AngleMaxDegrees)
+            || branch.AngleMinDegrees < 0.0f || branch.AngleMaxDegrees < branch.AngleMinDegrees || branch.AngleMaxDegrees > 180.0f
+            || !float.IsFinite(branch.WidthScale) || branch.WidthScale <= 0.0f
+            || !float.IsFinite(branch.Irregularity) || branch.Irregularity < 0.0f || branch.Irregularity > 1.0f)
+        {
+            error = $"{path} contains invalid branch generator values";
             return false;
         }
         return true;
@@ -599,6 +634,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(BranchGeneratorElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateBranchDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateInvertDictionary(element, elementPath, out error))
@@ -789,6 +831,39 @@ public static class PolyTextureValidator
             || stepX <= 0.0f || stepY <= 0.0f)
         {
             error = $"{path} contains invalid repeat grid values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateBranchDictionary(Godot.Collections.Dictionary branch, string path, out string error)
+    {
+        if (!RequireBool(branch, "enabled", out _, out error, path)
+            || !RequireNumber(branch, "opacity", out float opacity, out error, path)
+            || !RequireString(branch, "source_element_id", out string sourceId, out error, path)
+            || !RequireInt(branch, "seed", out int seed, out error, path)
+            || !RequireInt(branch, "count", out int count, out error, path)
+            || !RequireInt(branch, "segments", out int segments, out error, path)
+            || !RequireNumber(branch, "start_t", out float startT, out error, path)
+            || !RequireNumber(branch, "end_t", out float endT, out error, path)
+            || !RequireNumber(branch, "length_min_cm", out float lengthMin, out error, path)
+            || !RequireNumber(branch, "length_max_cm", out float lengthMax, out error, path)
+            || !RequireNumber(branch, "angle_min_degrees", out float angleMin, out error, path)
+            || !RequireNumber(branch, "angle_max_degrees", out float angleMax, out error, path)
+            || !RequireNumber(branch, "width_scale", out float widthScale, out error, path)
+            || !RequireNumber(branch, "irregularity", out float irregularity, out error, path)
+            || !RequireBool(branch, "render_source", out _, out error, path))
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(sourceId) || opacity < 0.0f || opacity > 1.0f
+            || seed < 0 || count < 1 || count > 4096 || segments < 1 || segments > 32
+            || startT < 0.0f || endT > 1.0f || startT > endT
+            || lengthMin <= 0.0f || lengthMax < lengthMin
+            || angleMin < 0.0f || angleMax < angleMin || angleMax > 180.0f
+            || widthScale <= 0.0f || irregularity < 0.0f || irregularity > 1.0f)
+        {
+            error = $"{path} contains invalid branch generator values";
             return false;
         }
         return true;

@@ -13,6 +13,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _outputInspector;
     private VBoxContainer _regionInspector;
     private VBoxContainer _repeatInspector;
+    private VBoxContainer _branchInspector;
     private VBoxContainer _filterInspector;
 
     private LineEdit _textureNameLineEdit;
@@ -86,6 +87,19 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _repeatStepXSpinBox;
     private SpinBox _repeatStepYSpinBox;
     private SpinBox _repeatRowOffsetSpinBox;
+    private Label _branchSourceLabel;
+    private SpinBox _branchSeedSpinBox;
+    private SpinBox _branchCountSpinBox;
+    private SpinBox _branchSegmentsSpinBox;
+    private SpinBox _branchStartTSpinBox;
+    private SpinBox _branchEndTSpinBox;
+    private SpinBox _branchLengthMinSpinBox;
+    private SpinBox _branchLengthMaxSpinBox;
+    private SpinBox _branchAngleMinSpinBox;
+    private SpinBox _branchAngleMaxSpinBox;
+    private SpinBox _branchWidthScaleSpinBox;
+    private SpinBox _branchIrregularitySpinBox;
+    private CheckBox _branchRenderSourceCheckBox;
     private Label _filterSourceLabel;
 
     public event Action DocumentChanged;
@@ -121,6 +135,7 @@ public partial class PolyTextureInspector : PanelContainer
         PolyTextureOutputBinding output = _document.ActiveOutput;
         RectangleRegionElement region = selectedElement as RectangleRegionElement;
         RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
+        BranchGeneratorElement branch = selectedElement as BranchGeneratorElement;
         InvertFilterElement invert = selectedElement as InvertFilterElement;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
@@ -130,6 +145,7 @@ public partial class PolyTextureInspector : PanelContainer
         _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
         _regionInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && region != null;
         _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
+        _branchInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && branch != null;
         _filterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && invert != null;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
@@ -304,6 +320,22 @@ public partial class PolyTextureInspector : PanelContainer
             _repeatStepXSpinBox.Value = repeat.StepXCm;
             _repeatStepYSpinBox.Value = repeat.StepYCm;
             _repeatRowOffsetSpinBox.Value = repeat.AlternateRowOffsetXCm;
+        }
+        if (branch != null)
+        {
+            _branchSourceLabel.Text = branch.SourceElementId;
+            _branchSeedSpinBox.Value = branch.Seed;
+            _branchCountSpinBox.Value = branch.Count;
+            _branchSegmentsSpinBox.Value = branch.Segments;
+            _branchStartTSpinBox.Value = branch.StartT;
+            _branchEndTSpinBox.Value = branch.EndT;
+            _branchLengthMinSpinBox.Value = branch.LengthMinCm;
+            _branchLengthMaxSpinBox.Value = branch.LengthMaxCm;
+            _branchAngleMinSpinBox.Value = branch.AngleMinDegrees;
+            _branchAngleMaxSpinBox.Value = branch.AngleMaxDegrees;
+            _branchWidthScaleSpinBox.Value = branch.WidthScale;
+            _branchIrregularitySpinBox.Value = branch.Irregularity;
+            _branchRenderSourceCheckBox.ButtonPressed = branch.RenderSource;
         }
         if (invert != null)
         {
@@ -589,6 +621,46 @@ public partial class PolyTextureInspector : PanelContainer
         AddField(_repeatInspector, "Alternate Row Offset X (cm)", _repeatRowOffsetSpinBox);
         _repeatRowOffsetSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.AlternateRowOffsetXCm = (float)value);
 
+        _branchInspector = CreateSection(stack, "Branch");
+        _branchSourceLabel = new Label();
+        AddField(_branchInspector, "Source", _branchSourceLabel);
+        _branchSeedSpinBox = CreateSpinBox(0, int.MaxValue, 1);
+        AddField(_branchInspector, "Seed", _branchSeedSpinBox);
+        _branchSeedSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Seed = (int)value);
+        _branchCountSpinBox = CreateSpinBox(1, 4096, 1);
+        AddField(_branchInspector, "Count", _branchCountSpinBox);
+        _branchCountSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Count = (int)value);
+        _branchSegmentsSpinBox = CreateSpinBox(1, 32, 1);
+        AddField(_branchInspector, "Segments", _branchSegmentsSpinBox);
+        _branchSegmentsSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Segments = (int)value);
+        _branchStartTSpinBox = CreateSpinBox(0, 1, 0.01);
+        AddField(_branchInspector, "Start", _branchStartTSpinBox);
+        _branchStartTSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.StartT = Mathf.Min((float)value, branch.EndT));
+        _branchEndTSpinBox = CreateSpinBox(0, 1, 0.01);
+        AddField(_branchInspector, "End", _branchEndTSpinBox);
+        _branchEndTSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.EndT = Mathf.Max((float)value, branch.StartT));
+        _branchLengthMinSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_branchInspector, "Length Min (cm)", _branchLengthMinSpinBox);
+        _branchLengthMinSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.LengthMinCm = Mathf.Min((float)value, branch.LengthMaxCm));
+        _branchLengthMaxSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_branchInspector, "Length Max (cm)", _branchLengthMaxSpinBox);
+        _branchLengthMaxSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.LengthMaxCm = Mathf.Max((float)value, branch.LengthMinCm));
+        _branchAngleMinSpinBox = CreateSpinBox(0, 180, 0.1);
+        AddField(_branchInspector, "Angle Min (deg)", _branchAngleMinSpinBox);
+        _branchAngleMinSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.AngleMinDegrees = Mathf.Min((float)value, branch.AngleMaxDegrees));
+        _branchAngleMaxSpinBox = CreateSpinBox(0, 180, 0.1);
+        AddField(_branchInspector, "Angle Max (deg)", _branchAngleMaxSpinBox);
+        _branchAngleMaxSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.AngleMaxDegrees = Mathf.Max((float)value, branch.AngleMinDegrees));
+        _branchWidthScaleSpinBox = CreateSpinBox(0.01, 100, 0.01);
+        AddField(_branchInspector, "Width Scale", _branchWidthScaleSpinBox);
+        _branchWidthScaleSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.WidthScale = (float)value);
+        _branchIrregularitySpinBox = CreateSpinBox(0, 1, 0.01);
+        AddField(_branchInspector, "Irregularity", _branchIrregularitySpinBox);
+        _branchIrregularitySpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Irregularity = (float)value);
+        _branchRenderSourceCheckBox = new CheckBox { Text = "Render Source" };
+        _branchRenderSourceCheckBox.Toggled += value => ApplyBranchChange(branch => branch.RenderSource = value);
+        _branchInspector.AddChild(_branchRenderSourceCheckBox);
+
         _filterInspector = CreateSection(stack, "Invert Filter");
         _filterSourceLabel = new Label();
         AddField(_filterInspector, "Source", _filterSourceLabel);
@@ -732,6 +804,17 @@ public partial class PolyTextureInspector : PanelContainer
             return;
         }
         apply(repeat);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplyBranchChange(Action<BranchGeneratorElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not BranchGeneratorElement branch)
+        {
+            return;
+        }
+        apply(branch);
         DocumentChanged?.Invoke();
         Refresh();
     }

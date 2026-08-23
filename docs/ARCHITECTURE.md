@@ -80,6 +80,11 @@ center path with per-point widths and Bezier handles. Its dedicated type keeps
 crack-specific generators and future reveal metadata distinct from generic
 drawn paths while reusing the same path editing interaction.
 
+`Branch` consumes a preceding Crack Line and deterministically derives tapered
+secondary strokes along its arc length. Seed, density, segment count, length,
+angle, width scale, and irregularity remain canonical parameters; generated
+strokes and their clipped polygons remain evaluator-owned derived data.
+
 `Repeat Grid` consumes preceding evaluated region geometry and produces a
 deterministic grid of translated instances. Signed alternate-row offset is a
 general parameter; a half-step offset is merely the brick-wall configuration.

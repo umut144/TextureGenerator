@@ -19,6 +19,7 @@ public static class PolyTextureDependencyService
                     || sweep.TargetElementId.Equals(elementId, StringComparison.Ordinal),
                 MirrorGeneratorElement mirror => mirror.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 RepeatGridGeneratorElement repeat => repeat.SourceElementId.Equals(elementId, StringComparison.Ordinal),
+                BranchGeneratorElement branch => branch.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 InvertFilterElement invert => invert.SourceElementId.Equals(elementId, StringComparison.Ordinal),
                 _ => false
             };

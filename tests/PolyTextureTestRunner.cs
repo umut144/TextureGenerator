@@ -17,6 +17,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("crack lines remain semantic editable paths", TestCrackLineRoundTrip);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
+        Run("branch generator produces deterministic crack structures", TestBranchGenerator);
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
         Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
@@ -263,6 +264,52 @@ public partial class PolyTextureTestRunner : SceneTree
         RepeatGridGeneratorElement loadedRepeat = loaded.Textures[0].GetElement("repeat") as RepeatGridGeneratorElement;
         Equal(3, loadedRepeat.Columns, "repeat columns round trip");
         Near(-50.0f, loadedRepeat.AlternateRowOffsetXCm, 0.0001f, "repeat offset round trip");
+    }
+
+    private static void TestBranchGenerator()
+    {
+        PolyTextureDocument document = CreateCrackDocument();
+        PolyTextureItem texture = document.Textures[0];
+        BranchGeneratorElement branch = texture.GetElement("branches") as BranchGeneratorElement;
+        Assert(branch != null, "branch generator missing");
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+
+        List<CenterStrokeElement> first = PolyTextureRenderer.BuildBranchStrokes(texture, branch);
+        List<CenterStrokeElement> second = PolyTextureRenderer.BuildBranchStrokes(texture, branch);
+        Equal(branch.Count, first.Count, "branch count");
+        Equal(first.Count, second.Count, "deterministic branch count");
+        for (int index = 0; index < first.Count; index++)
+        {
+            Equal(branch.Segments + 1, first[index].Points.Count, $"branch {index} segment points");
+            for (int pointIndex = 0; pointIndex < first[index].Points.Count; pointIndex++)
+            {
+                Near(first[index].Points[pointIndex].Position, second[index].Points[pointIndex].Position, 0.0001f, $"branch {index} point {pointIndex}");
+            }
+            Assert(first[index].Points[^1].LeftWidth < first[index].Points[0].LeftWidth, "branch width must taper");
+        }
+
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        Assert(evaluation.HiddenSourceIds.Contains("main_crack"), "branch should replace source preview");
+        Equal(branch.Count + 1, evaluation.GetGeometry(branch.Id).Count, "combined source and branch polygons");
+
+        string path = "user://polytexture_test_branch.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        BranchGeneratorElement loadedBranch = loaded.Textures[0].GetElement("branches") as BranchGeneratorElement;
+        Assert(loadedBranch != null, "branch missing after round trip");
+        Equal(branch.Seed, loadedBranch.Seed, "branch seed round trip");
+        Near(branch.Irregularity, loadedBranch.Irregularity, 0.0001f, "branch irregularity round trip");
+
+        Image mask = PolyTextureBakeService.BakeScalar(texture, texture.GetOutput("crack_mask"), 96, 96);
+        bool hasCrack = false;
+        for (int y = 0; y < mask.GetHeight() && !hasCrack; y++)
+        {
+            for (int x = 0; x < mask.GetWidth(); x++)
+            {
+                hasCrack |= mask.GetPixel(x, y).R > 0.5f;
+            }
+        }
+        Assert(hasCrack, "branch mask bake should contain crack structure");
     }
 
     private static void TestMirror()
@@ -574,6 +621,52 @@ public partial class PolyTextureTestRunner : SceneTree
         };
         texture.Elements.Add(brick);
         texture.Elements.Add(repeat);
+        document.Textures.Add(texture);
+        return document;
+    }
+
+    private static PolyTextureDocument CreateCrackDocument()
+    {
+        PolyTextureDocument document = new()
+        {
+            Name = "Cracks",
+            ActiveTextureId = "cracks",
+            ActiveElementId = "branches",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "cracks", Name = "Cracks" };
+        CrackLineElement crack = new()
+        {
+            Id = "main_crack",
+            Name = "Main Crack",
+            Transform = new PolyTextureElementTransform { Position = new Vector2(200.0f, 80.0f) }
+        };
+        crack.Points.Add(new CenterStrokePoint { X = 0.0f, Y = 0.0f, LeftWidth = 5.0f, RightWidth = 5.0f, HandleMode = PolyTextureHandleMode.Aligned });
+        crack.Points.Add(new CenterStrokePoint { X = 12.0f, Y = 120.0f, LeftWidth = 4.0f, RightWidth = 4.0f, HandleMode = PolyTextureHandleMode.Aligned });
+        crack.Points.Add(new CenterStrokePoint { X = -8.0f, Y = 240.0f, LeftWidth = 2.0f, RightWidth = 2.0f, HandleMode = PolyTextureHandleMode.Aligned });
+        BranchGeneratorElement branches = new()
+        {
+            Id = "branches",
+            Name = "Crack Branches",
+            SourceElementId = crack.Id,
+            Seed = 42,
+            Count = 6,
+            Segments = 3,
+            LengthMinCm = 20.0f,
+            LengthMaxCm = 45.0f,
+            Irregularity = 0.35f,
+            RenderSource = true
+        };
+        texture.Elements.Add(crack);
+        texture.Elements.Add(branches);
+        PolyTextureOutputBinding mask = new()
+        {
+            Id = "crack_mask",
+            Name = "Cracks",
+            Kind = PolyTextureOutputKind.Mask
+        };
+        mask.SourceElementIds.Add(branches.Id);
+        texture.Outputs.Add(mask);
         document.Textures.Add(texture);
         return document;
     }

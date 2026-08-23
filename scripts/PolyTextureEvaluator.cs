@@ -51,6 +51,18 @@ public static class PolyTextureEvaluator
                 result.GeometryByElementId[repeat.Id] = polygons;
                 result.LiveRepeatGrids.Add(repeat);
             }
+            else if (operation is BranchGeneratorElement branch)
+            {
+                result.HiddenSourceIds.Add(branch.SourceElementId);
+                List<List<Vector2>> polygons = PolyTextureRenderer.BuildBranchPolygons(texture, branch);
+                if (branch.RenderSource)
+                {
+                    polygons.InsertRange(0, result.GetGeometry(branch.SourceElementId));
+                }
+                polygons = PolyTextureRenderer.ClipPolygonsToDomain(polygons, texture.DomainWidthCm, texture.DomainHeightCm);
+                result.GeometryByElementId[branch.Id] = polygons;
+                result.LiveBranches.Add(branch);
+            }
             else if (operation is MirrorGeneratorElement mirror)
             {
                 result.HiddenSourceIds.Add(mirror.SourceElementId);
