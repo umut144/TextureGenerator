@@ -145,6 +145,10 @@ public static class PolyTextureStore
         {
             AppendMirror(builder, mirror, indent, suffix);
         }
+        else if (element is RepeatGridGeneratorElement repeat)
+        {
+            AppendRepeatGrid(builder, repeat, indent, suffix);
+        }
         else if (element is SweepGeneratorElement sweep)
         {
             AppendSweep(builder, sweep, indent, suffix);
@@ -157,6 +161,23 @@ public static class PolyTextureStore
         {
             AppendCenterStroke(builder, centerStroke, includeBezierData: false, indent, suffix);
         }
+    }
+
+    private static void AppendRepeatGrid(StringBuilder builder, RepeatGridGeneratorElement repeat, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(repeat.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(repeat.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{RepeatGridGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(repeat.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(repeat.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(repeat.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"columns\": {repeat.Columns},");
+        builder.AppendLine($"{indent}  \"rows\": {repeat.Rows},");
+        builder.AppendLine($"{indent}  \"step_x_cm\": {Number(repeat.StepXCm)},");
+        builder.AppendLine($"{indent}  \"step_y_cm\": {Number(repeat.StepYCm)},");
+        builder.AppendLine($"{indent}  \"alternate_row_offset_x_cm\": {Number(repeat.AlternateRowOffsetXCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
     }
 
     private static void AppendRectangleRegion(StringBuilder builder, RectangleRegionElement region, string indent, string suffix)
@@ -378,6 +399,11 @@ public static class PolyTextureStore
             return ReadSweep(element);
         }
 
+        if (type.Equals(RepeatGridGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadRepeatGrid(element);
+        }
+
         if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadMirror(element);
@@ -386,6 +412,23 @@ public static class PolyTextureStore
         return new CenterStrokeElement
         {
             Id = ReadString(element, "id", "center_stroke01")
+        };
+    }
+
+    private static RepeatGridGeneratorElement ReadRepeatGrid(Godot.Collections.Dictionary repeat)
+    {
+        return new RepeatGridGeneratorElement
+        {
+            Id = ReadString(repeat, "id", "repeat_grid"),
+            Name = ReadString(repeat, "name", "Repeat Grid"),
+            Enabled = ReadBool(repeat, "enabled", true),
+            Opacity = ReadFloat(repeat, "opacity", 0.86f),
+            SourceElementId = ReadString(repeat, "source_element_id", string.Empty),
+            Columns = ReadInt(repeat, "columns", 1),
+            Rows = ReadInt(repeat, "rows", 1),
+            StepXCm = ReadFloat(repeat, "step_x_cm", 1.0f),
+            StepYCm = ReadFloat(repeat, "step_y_cm", 1.0f),
+            AlternateRowOffsetXCm = ReadFloat(repeat, "alternate_row_offset_x_cm", 0.0f)
         };
     }
 
@@ -527,7 +570,10 @@ public static class PolyTextureStore
 
     private static int ReadInt(Godot.Collections.Dictionary dictionary, string key, int fallback)
     {
-        return dictionary.ContainsKey(key) && dictionary[key].VariantType == Variant.Type.Int ? dictionary[key].AsInt32() : fallback;
+        return dictionary.ContainsKey(key)
+            && (dictionary[key].VariantType == Variant.Type.Int || dictionary[key].VariantType == Variant.Type.Float)
+            ? dictionary[key].AsInt32()
+            : fallback;
     }
 
     private static bool ReadBool(Godot.Collections.Dictionary dictionary, string key, bool fallback)

@@ -418,6 +418,15 @@ public partial class PolyTextureCanvasView : Control
             }
         }
 
+        foreach (RepeatGridGeneratorElement repeat in evaluation.LiveRepeatGrids)
+        {
+            bool operationActive = active && repeat == _document.ActiveElement;
+            if (!evaluation.HiddenSourceIds.Contains(repeat.Id) || operationActive)
+            {
+                DrawRegionPreview(evaluation.GetGeometry(repeat.Id), repeat.Opacity, operationActive);
+            }
+        }
+
         foreach (MirrorGeneratorElement mirror in evaluation.LiveMirrors)
         {
             bool operationActive = active && mirror == _document.ActiveElement;

@@ -198,6 +198,14 @@ public static class PolyTextureValidator
                         return false;
                     }
                 }
+                else if (element is RepeatGridGeneratorElement repeat)
+                {
+                    if (!evaluatedElementIds.Contains(repeat.SourceElementId))
+                    {
+                        error = $"{path}.elements[{element.Id}] must reference a preceding source";
+                        return false;
+                    }
+                }
                 evaluatedElementIds.Add(element.Id);
             }
         }
@@ -272,6 +280,11 @@ public static class PolyTextureValidator
             return false;
         }
 
+        if (element is RepeatGridGeneratorElement repeat && !ValidateRepeatGrid(repeat, path, out error))
+        {
+            return false;
+        }
+
         if (element is MirrorGeneratorElement mirror
             && (string.IsNullOrWhiteSpace(mirror.SourceElementId) || string.IsNullOrWhiteSpace(mirror.AxisGuideId)))
         {
@@ -316,6 +329,21 @@ public static class PolyTextureValidator
             || region.CornerRadiusCm < 0.0f || region.CornerRadiusCm > maximumRadius)
         {
             error = $"{path} contains invalid rectangle region values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateRepeatGrid(RepeatGridGeneratorElement repeat, string path, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(repeat.SourceElementId)
+            || repeat.Columns < 1 || repeat.Rows < 1 || repeat.Columns * repeat.Rows > 16384
+            || !float.IsFinite(repeat.StepXCm) || !float.IsFinite(repeat.StepYCm)
+            || !float.IsFinite(repeat.AlternateRowOffsetXCm)
+            || repeat.StepXCm <= 0.0f || repeat.StepYCm <= 0.0f)
+        {
+            error = $"{path} contains invalid repeat grid values";
             return false;
         }
         return true;
@@ -549,6 +577,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(RepeatGridGeneratorElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateRepeatGridDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateMirrorDictionary(element, elementPath, out error))
@@ -708,6 +743,30 @@ public static class PolyTextureValidator
             || width <= 0.0f || height <= 0.0f || radius < 0.0f || radius > Mathf.Min(width, height) * 0.5f)
         {
             error = $"{path} contains invalid rectangle region values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateRepeatGridDictionary(Godot.Collections.Dictionary repeat, string path, out string error)
+    {
+        if (!RequireBool(repeat, "enabled", out _, out error, path)
+            || !RequireNumber(repeat, "opacity", out float opacity, out error, path)
+            || !RequireString(repeat, "source_element_id", out string sourceId, out error, path)
+            || !RequireInt(repeat, "columns", out int columns, out error, path)
+            || !RequireInt(repeat, "rows", out int rows, out error, path)
+            || !RequireNumber(repeat, "step_x_cm", out float stepX, out error, path)
+            || !RequireNumber(repeat, "step_y_cm", out float stepY, out error, path)
+            || !RequireNumber(repeat, "alternate_row_offset_x_cm", out float rowOffset, out error, path))
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(sourceId) || opacity < 0.0f || opacity > 1.0f
+            || columns < 1 || rows < 1 || columns * rows > 16384
+            || !float.IsFinite(stepX) || !float.IsFinite(stepY) || !float.IsFinite(rowOffset)
+            || stepX <= 0.0f || stepY <= 0.0f)
+        {
+            error = $"{path} contains invalid repeat grid values";
             return false;
         }
         return true;

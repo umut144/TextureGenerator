@@ -212,6 +212,33 @@ public static class PolyTextureRenderer
         return mirroredPolygons;
     }
 
+    public static List<List<Vector2>> BuildRepeatGridPolygons(List<List<Vector2>> sourcePolygons, RepeatGridGeneratorElement repeat)
+    {
+        List<List<Vector2>> result = new();
+        if (repeat == null || !repeat.Enabled || repeat.Columns < 1 || repeat.Rows < 1)
+        {
+            return result;
+        }
+        for (int row = 0; row < repeat.Rows; row++)
+        {
+            float rowOffset = row % 2 == 0 ? 0.0f : repeat.AlternateRowOffsetXCm;
+            for (int column = 0; column < repeat.Columns; column++)
+            {
+                Vector2 offset = new(column * repeat.StepXCm + rowOffset, row * repeat.StepYCm);
+                foreach (List<Vector2> sourcePolygon in sourcePolygons)
+                {
+                    List<Vector2> instance = new(sourcePolygon.Count);
+                    foreach (Vector2 point in sourcePolygon)
+                    {
+                        instance.Add(point + offset);
+                    }
+                    result.Add(instance);
+                }
+            }
+        }
+        return result;
+    }
+
     public static CenterStrokeElement BuildMirrorElement(PolyTextureItem texture, MirrorGeneratorElement mirror)
     {
         if (texture == null || mirror == null || !mirror.Enabled)

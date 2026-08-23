@@ -12,6 +12,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _pointInspector;
     private VBoxContainer _outputInspector;
     private VBoxContainer _regionInspector;
+    private VBoxContainer _repeatInspector;
 
     private LineEdit _textureNameLineEdit;
     private OptionButton _textureOriginOptionButton;
@@ -78,6 +79,12 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _regionWidthSpinBox;
     private SpinBox _regionHeightSpinBox;
     private SpinBox _regionCornerRadiusSpinBox;
+    private Label _repeatSourceLabel;
+    private SpinBox _repeatColumnsSpinBox;
+    private SpinBox _repeatRowsSpinBox;
+    private SpinBox _repeatStepXSpinBox;
+    private SpinBox _repeatStepYSpinBox;
+    private SpinBox _repeatRowOffsetSpinBox;
 
     public event Action DocumentChanged;
 
@@ -111,6 +118,7 @@ public partial class PolyTextureInspector : PanelContainer
         bool supportsBezierHandles = element?.SupportsBezierHandles == true;
         PolyTextureOutputBinding output = _document.ActiveOutput;
         RectangleRegionElement region = selectedElement as RectangleRegionElement;
+        RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
         _elementInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element;
@@ -118,6 +126,7 @@ public partial class PolyTextureInspector : PanelContainer
         _pointInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Point;
         _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
         _regionInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && region != null;
+        _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
         _domainWidthSpinBox.Editable = hasTexture;
@@ -282,6 +291,15 @@ public partial class PolyTextureInspector : PanelContainer
             _regionHeightSpinBox.Value = region.HeightCm;
             _regionCornerRadiusSpinBox.MaxValue = Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f;
             _regionCornerRadiusSpinBox.Value = region.CornerRadiusCm;
+        }
+        if (repeat != null)
+        {
+            _repeatSourceLabel.Text = repeat.SourceElementId;
+            _repeatColumnsSpinBox.Value = repeat.Columns;
+            _repeatRowsSpinBox.Value = repeat.Rows;
+            _repeatStepXSpinBox.Value = repeat.StepXCm;
+            _repeatStepYSpinBox.Value = repeat.StepYCm;
+            _repeatRowOffsetSpinBox.Value = repeat.AlternateRowOffsetXCm;
         }
 
         _refreshing = false;
@@ -543,6 +561,25 @@ public partial class PolyTextureInspector : PanelContainer
         _regionCornerRadiusSpinBox = CreateSpinBox(0, 50000, 0.01);
         AddField(_regionInspector, "Corner Radius (cm)", _regionCornerRadiusSpinBox);
         _regionCornerRadiusSpinBox.ValueChanged += value => ApplyRegionChange(region => region.CornerRadiusCm = Mathf.Min((float)value, Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f));
+
+        _repeatInspector = CreateSection(stack, "Repeat Grid");
+        _repeatSourceLabel = new Label();
+        AddField(_repeatInspector, "Source", _repeatSourceLabel);
+        _repeatColumnsSpinBox = CreateSpinBox(1, 256, 1);
+        AddField(_repeatInspector, "Columns", _repeatColumnsSpinBox);
+        _repeatColumnsSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.Columns = ClampRepeatCount((int)value, repeat.Rows));
+        _repeatRowsSpinBox = CreateSpinBox(1, 256, 1);
+        AddField(_repeatInspector, "Rows", _repeatRowsSpinBox);
+        _repeatRowsSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.Rows = ClampRepeatCount((int)value, repeat.Columns));
+        _repeatStepXSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_repeatInspector, "Step X (cm)", _repeatStepXSpinBox);
+        _repeatStepXSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.StepXCm = (float)value);
+        _repeatStepYSpinBox = CreateSpinBox(0.01, 100000, 0.01);
+        AddField(_repeatInspector, "Step Y (cm)", _repeatStepYSpinBox);
+        _repeatStepYSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.StepYCm = (float)value);
+        _repeatRowOffsetSpinBox = CreateSpinBox(-100000, 100000, 0.01);
+        AddField(_repeatInspector, "Alternate Row Offset X (cm)", _repeatRowOffsetSpinBox);
+        _repeatRowOffsetSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.AlternateRowOffsetXCm = (float)value);
     }
 
     private static VBoxContainer CreateSection(VBoxContainer stack, string title)
@@ -674,6 +711,22 @@ public partial class PolyTextureInspector : PanelContainer
     private void ApplyRegionDisplayPosition(Vector2 displayPosition)
     {
         ApplyRegionChange(region => region.Position = ToStoredPosition(displayPosition));
+    }
+
+    private void ApplyRepeatChange(Action<RepeatGridGeneratorElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not RepeatGridGeneratorElement repeat)
+        {
+            return;
+        }
+        apply(repeat);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private static int ClampRepeatCount(int requested, int otherAxisCount)
+    {
+        return Mathf.Clamp(requested, 1, Mathf.Max(1, 16384 / Mathf.Max(1, otherAxisCount)));
     }
 
     private void ApplyElementName(string value)

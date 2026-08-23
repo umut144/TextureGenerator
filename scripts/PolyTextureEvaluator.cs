@@ -43,6 +43,13 @@ public static class PolyTextureEvaluator
                 result.GeometryByElementId[sweep.Id] = polygons;
                 result.LiveSweeps.Add(sweep);
             }
+            else if (operation is RepeatGridGeneratorElement repeat)
+            {
+                result.HiddenSourceIds.Add(repeat.SourceElementId);
+                List<List<Vector2>> polygons = PolyTextureRenderer.BuildRepeatGridPolygons(result.GetGeometry(repeat.SourceElementId), repeat);
+                result.GeometryByElementId[repeat.Id] = polygons;
+                result.LiveRepeatGrids.Add(repeat);
+            }
             else if (operation is MirrorGeneratorElement mirror)
             {
                 result.HiddenSourceIds.Add(mirror.SourceElementId);

@@ -35,6 +35,7 @@ public partial class PolyTextureWorkspace : Control
     private const int DrawCenterPathMenuId = 2;
     private const int FinishDrawingMenuId = 3;
     private const int GenerateSweepMenuId = 1;
+    private const int GenerateRepeatGridMenuId = 2;
     private const int OperatorMirrorMenuId = 1;
     private const int GuidePointMenuId = 1;
     private const int GuideAxisMenuId = 2;
@@ -349,6 +350,7 @@ public partial class PolyTextureWorkspace : Control
         _generateMenuButton = new MenuButton { Text = "Generator" };
         PopupMenu generatePopup = _generateMenuButton.GetPopup();
         generatePopup.AddItem("Sweep", GenerateSweepMenuId);
+        generatePopup.AddItem("Repeat Grid", GenerateRepeatGridMenuId);
         generatePopup.IdPressed += OnGenerateMenuPressed;
         _generateMenuButton.Disabled = true;
         toolbar.AddChild(_generateMenuButton);
@@ -1345,6 +1347,71 @@ public partial class PolyTextureWorkspace : Control
         {
             BeginSweepCreation();
         }
+        else if ((int)id == GenerateRepeatGridMenuId)
+        {
+            AddRepeatGrid();
+        }
+    }
+
+    private void AddRepeatGrid()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureElement source = _document?.ActiveElement;
+        if (texture == null || source == null)
+        {
+            SetStatus("Select a source or generated element before adding Repeat Grid.");
+            return;
+        }
+
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        List<List<Vector2>> sourceGeometry = evaluation.GetGeometry(source.Id);
+        if (sourceGeometry.Count == 0)
+        {
+            SetStatus("The selected element has no repeatable region geometry.");
+            return;
+        }
+
+        Rect2 bounds = GetGeometryBounds(sourceGeometry);
+        float stepX = Mathf.Max(0.01f, bounds.Size.X + 5.0f);
+        float stepY = Mathf.Max(0.01f, bounds.Size.Y + 5.0f);
+        RepeatGridGeneratorElement repeat = new()
+        {
+            Id = EnsureUniqueElementId(texture, "repeat_grid"),
+            Name = "Repeat Grid",
+            SourceElementId = source.Id,
+            Columns = Mathf.Clamp(Mathf.CeilToInt(texture.DomainWidthCm / stepX) + 1, 1, 256),
+            Rows = Mathf.Clamp(Mathf.CeilToInt(texture.DomainHeightCm / stepY) + 1, 1, 256),
+            StepXCm = stepX,
+            StepYCm = stepY,
+            AlternateRowOffsetXCm = -stepX * 0.5f
+        };
+        while (repeat.Columns * repeat.Rows > 16384)
+        {
+            repeat.Rows--;
+        }
+        texture.Elements.Add(repeat);
+        _document.ActiveElementId = repeat.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Repeat Grid generator added.");
+    }
+
+    private static Rect2 GetGeometryBounds(List<List<Vector2>> geometry)
+    {
+        Vector2 minimum = new(float.MaxValue, float.MaxValue);
+        Vector2 maximum = new(float.MinValue, float.MinValue);
+        foreach (List<Vector2> polygon in geometry)
+        {
+            foreach (Vector2 point in polygon)
+            {
+                minimum = minimum.Min(point);
+                maximum = maximum.Max(point);
+            }
+        }
+        return new Rect2(minimum, maximum - minimum);
     }
 
     private void OnOperatorMenuPressed(long id)
@@ -1496,7 +1563,7 @@ public partial class PolyTextureWorkspace : Control
         {
             _generateMenuButton.Disabled = _sweepCreationState != SweepCreationState.None
                 || _mirrorCreationState != MirrorCreationState.None
-                || !CanBeginSweepCreation();
+                || _document?.ActiveTexture?.Elements.Count == 0;
         }
 
         if (_operatorMenuButton != null)
@@ -2511,6 +2578,12 @@ public partial class PolyTextureWorkspace : Control
                         AddGeneratorInfoItem(elementItem, $"Target: {sweep.TargetElementId}");
                         int instanceCount = sweep.SideMode == PolyTextureSweepSideMode.Both ? sweep.Count * 2 : sweep.Count;
                         AddGeneratorInfoItem(elementItem, $"Instances: {instanceCount}");
+                    }
+                    else if (element is RepeatGridGeneratorElement repeat)
+                    {
+                        AddGeneratorInfoItem(elementItem, $"Source: {repeat.SourceElementId}");
+                        AddGeneratorInfoItem(elementItem, $"Grid: {repeat.Columns} x {repeat.Rows}");
+                        AddGeneratorInfoItem(elementItem, $"Step: {repeat.StepXCm:0.##} x {repeat.StepYCm:0.##} cm");
                     }
                     else if (element is MirrorGeneratorElement mirror)
                     {

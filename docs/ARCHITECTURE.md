@@ -75,6 +75,10 @@ Initial port types are `PointSet`, `PathSet`, `RegionSet`, `InstanceSet`,
 data is position, physical size, rotation, and corner radius; polygon samples
 are always derived by the evaluator.
 
+`Repeat Grid` consumes preceding evaluated region geometry and produces a
+deterministic grid of translated instances. Signed alternate-row offset is a
+general parameter; a half-step offset is merely the brick-wall configuration.
+
 ## Format policy
 
 The procedural document format starts at schema 1. Unsupported schema versions

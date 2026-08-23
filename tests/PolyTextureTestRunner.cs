@@ -15,6 +15,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
+        Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
         Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
@@ -182,6 +183,29 @@ public partial class PolyTextureTestRunner : SceneTree
         List<CenterStrokeElement> instances = PolyTextureRenderer.BuildSweepInstances(document.Textures[0], evaluation.LiveSweeps[0]);
         Equal(9, instances.Count, "live parameter update");
         Assert(document.Textures[0].Elements.Count == 3, "evaluation must not append editable copies");
+    }
+
+    private static void TestRepeatGrid()
+    {
+        PolyTextureDocument document = CreateWallDocument();
+        PolyTextureItem texture = document.Textures[0];
+        RepeatGridGeneratorElement repeat = texture.GetElement("repeat") as RepeatGridGeneratorElement;
+        PolyTextureEvaluationResult first = PolyTextureEvaluator.Evaluate(texture);
+        PolyTextureEvaluationResult second = PolyTextureEvaluator.Evaluate(texture);
+        Equal(6, first.GetGeometry(repeat.Id).Count, "repeat instance count");
+        Equal(first.GetGeometry(repeat.Id).Count, second.GetGeometry(repeat.Id).Count, "repeat deterministic count");
+        Vector2 firstPoint = first.GetGeometry(repeat.Id)[0][0];
+        Vector2 staggeredPoint = first.GetGeometry(repeat.Id)[3][0];
+        Near(firstPoint + new Vector2(repeat.AlternateRowOffsetXCm, repeat.StepYCm), staggeredPoint, 0.0001f, "staggered row offset");
+        Assert(first.HiddenSourceIds.Contains("brick"), "repeat should replace source preview");
+        Assert(PolyTextureValidator.Validate(document, out string error), error);
+
+        string path = "user://polytexture_test_repeat.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        RepeatGridGeneratorElement loadedRepeat = loaded.Textures[0].GetElement("repeat") as RepeatGridGeneratorElement;
+        Equal(3, loadedRepeat.Columns, "repeat columns round trip");
+        Near(-50.0f, loadedRepeat.AlternateRowOffsetXCm, 0.0001f, "repeat offset round trip");
     }
 
     private static void TestMirror()
@@ -403,6 +427,42 @@ public partial class PolyTextureTestRunner : SceneTree
             Kind = PolyTextureOutputKind.Mask,
         });
         texture.Outputs[^1].SourceElementIds.Add(sweep.Id);
+        document.Textures.Add(texture);
+        return document;
+    }
+
+    private static PolyTextureDocument CreateWallDocument()
+    {
+        PolyTextureDocument document = new()
+        {
+            Name = "Wall",
+            ActiveTextureId = "wall",
+            ActiveElementId = "repeat",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "wall", Name = "Wall" };
+        RectangleRegionElement brick = new()
+        {
+            Id = "brick",
+            Name = "Brick",
+            Position = new Vector2(40.0f, 20.0f),
+            WidthCm = 80.0f,
+            HeightCm = 40.0f,
+            CornerRadiusCm = 2.0f
+        };
+        RepeatGridGeneratorElement repeat = new()
+        {
+            Id = "repeat",
+            Name = "Brick Repeat",
+            SourceElementId = brick.Id,
+            Columns = 3,
+            Rows = 2,
+            StepXCm = 100.0f,
+            StepYCm = 50.0f,
+            AlternateRowOffsetXCm = -50.0f
+        };
+        texture.Elements.Add(brick);
+        texture.Elements.Add(repeat);
         document.Textures.Add(texture);
         return document;
     }
