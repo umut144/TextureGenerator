@@ -92,6 +92,8 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _branchSeedSpinBox;
     private SpinBox _branchCountSpinBox;
     private SpinBox _branchSegmentsSpinBox;
+    private SpinBox _branchDepthSpinBox;
+    private SpinBox _branchChildrenSpinBox;
     private SpinBox _branchStartTSpinBox;
     private SpinBox _branchEndTSpinBox;
     private SpinBox _branchLengthMinSpinBox;
@@ -100,6 +102,7 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _branchAngleMaxSpinBox;
     private SpinBox _branchWidthScaleSpinBox;
     private SpinBox _branchIrregularitySpinBox;
+    private SpinBox _branchDepthLengthScaleSpinBox;
     private CheckBox _branchRenderSourceCheckBox;
     private Label _filterSourceLabel;
     private Label _edgeFalloffSourceLabel;
@@ -333,6 +336,8 @@ public partial class PolyTextureInspector : PanelContainer
             _branchSeedSpinBox.Value = branch.Seed;
             _branchCountSpinBox.Value = branch.Count;
             _branchSegmentsSpinBox.Value = branch.Segments;
+            _branchDepthSpinBox.Value = branch.Depth;
+            _branchChildrenSpinBox.Value = branch.ChildrenPerBranch;
             _branchStartTSpinBox.Value = branch.StartT;
             _branchEndTSpinBox.Value = branch.EndT;
             _branchLengthMinSpinBox.Value = branch.LengthMinCm;
@@ -341,6 +346,7 @@ public partial class PolyTextureInspector : PanelContainer
             _branchAngleMaxSpinBox.Value = branch.AngleMaxDegrees;
             _branchWidthScaleSpinBox.Value = branch.WidthScale;
             _branchIrregularitySpinBox.Value = branch.Irregularity;
+            _branchDepthLengthScaleSpinBox.Value = branch.DepthLengthScale;
             _branchRenderSourceCheckBox.ButtonPressed = branch.RenderSource;
         }
         if (invert != null)
@@ -645,6 +651,12 @@ public partial class PolyTextureInspector : PanelContainer
         _branchSegmentsSpinBox = CreateSpinBox(1, 32, 1);
         AddField(_branchInspector, "Segments", _branchSegmentsSpinBox);
         _branchSegmentsSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Segments = (int)value);
+        _branchDepthSpinBox = CreateSpinBox(1, 5, 1);
+        AddField(_branchInspector, "Depth", _branchDepthSpinBox);
+        _branchDepthSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Depth = (int)value);
+        _branchChildrenSpinBox = CreateSpinBox(1, 4, 1);
+        AddField(_branchInspector, "Children / Branch", _branchChildrenSpinBox);
+        _branchChildrenSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.ChildrenPerBranch = (int)value);
         _branchStartTSpinBox = CreateSpinBox(0, 1, 0.01);
         AddField(_branchInspector, "Start", _branchStartTSpinBox);
         _branchStartTSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.StartT = Mathf.Min((float)value, branch.EndT));
@@ -669,6 +681,9 @@ public partial class PolyTextureInspector : PanelContainer
         _branchIrregularitySpinBox = CreateSpinBox(0, 1, 0.01);
         AddField(_branchInspector, "Irregularity", _branchIrregularitySpinBox);
         _branchIrregularitySpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.Irregularity = (float)value);
+        _branchDepthLengthScaleSpinBox = CreateSpinBox(0.01, 1, 0.01);
+        AddField(_branchInspector, "Depth Length Scale", _branchDepthLengthScaleSpinBox);
+        _branchDepthLengthScaleSpinBox.ValueChanged += value => ApplyBranchChange(branch => branch.DepthLengthScale = (float)value);
         _branchRenderSourceCheckBox = new CheckBox { Text = "Render Source" };
         _branchRenderSourceCheckBox.Toggled += value => ApplyBranchChange(branch => branch.RenderSource = value);
         _branchInspector.AddChild(_branchRenderSourceCheckBox);

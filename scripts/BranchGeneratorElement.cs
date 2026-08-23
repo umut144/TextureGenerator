@@ -6,6 +6,8 @@ public sealed class BranchGeneratorElement : PolyTextureElement
     public int Seed { get; set; } = 1;
     public int Count { get; set; } = 10;
     public int Segments { get; set; } = 3;
+    public int Depth { get; set; } = 1;
+    public int ChildrenPerBranch { get; set; } = 2;
     public float StartT { get; set; } = 0.08f;
     public float EndT { get; set; } = 0.92f;
     public float LengthMinCm { get; set; } = 18.0f;
@@ -14,6 +16,7 @@ public sealed class BranchGeneratorElement : PolyTextureElement
     public float AngleMaxDegrees { get; set; } = 65.0f;
     public float WidthScale { get; set; } = 0.45f;
     public float Irregularity { get; set; } = 0.25f;
+    public float DepthLengthScale { get; set; } = 0.55f;
     public bool RenderSource { get; set; } = true;
 
     public override string Type => ElementType;
@@ -30,6 +33,8 @@ public sealed class BranchGeneratorElement : PolyTextureElement
             Seed = Seed,
             Count = Count,
             Segments = Segments,
+            Depth = Depth,
+            ChildrenPerBranch = ChildrenPerBranch,
             StartT = StartT,
             EndT = EndT,
             LengthMinCm = LengthMinCm,
@@ -38,6 +43,7 @@ public sealed class BranchGeneratorElement : PolyTextureElement
             AngleMaxDegrees = AngleMaxDegrees,
             WidthScale = WidthScale,
             Irregularity = Irregularity,
+            DepthLengthScale = DepthLengthScale,
             RenderSource = RenderSource
         };
     }

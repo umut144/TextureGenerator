@@ -254,35 +254,87 @@ public static class PolyTextureRenderer
             return result;
         }
 
+        uint randomState = unchecked((uint)branch.Seed) ^ 0x9E3779B9u;
+        int derivedIndex = 0;
+        List<CenterStrokeElement> generation = AppendBranchGeneration(
+            result,
+            path,
+            AverageStrokeWidth(source) * source.Transform.WidthScale,
+            branch.Count,
+            1.0f,
+            branch,
+            ref randomState,
+            ref derivedIndex);
+
+        for (int depth = 2; depth <= branch.Depth; depth++)
+        {
+            List<CenterStrokeElement> nextGeneration = new();
+            float lengthScale = Mathf.Pow(branch.DepthLengthScale, depth - 1);
+            foreach (CenterStrokeElement parent in generation)
+            {
+                List<CenterStrokeElement> children = AppendBranchGeneration(
+                    result,
+                    BuildCenterPath(parent),
+                    AverageStrokeWidth(parent),
+                    branch.ChildrenPerBranch,
+                    lengthScale,
+                    branch,
+                    ref randomState,
+                    ref derivedIndex);
+                nextGeneration.AddRange(children);
+            }
+            generation = nextGeneration;
+            if (generation.Count == 0 || result.Count >= 4096)
+            {
+                break;
+            }
+        }
+        return result;
+    }
+
+    private static List<CenterStrokeElement> AppendBranchGeneration(
+        List<CenterStrokeElement> allStrokes,
+        List<Vector2> path,
+        float sourceWidth,
+        int count,
+        float lengthScale,
+        BranchGeneratorElement branch,
+        ref uint randomState,
+        ref int derivedIndex)
+    {
+        List<CenterStrokeElement> generation = new();
+        if (path.Count < 2 || count < 1)
+        {
+            return generation;
+        }
         List<float> cumulativeLengths = BuildCumulativeLengths(path);
         float totalLength = cumulativeLengths[^1];
         if (totalLength <= 0.0001f)
         {
-            return result;
+            return generation;
         }
 
-        float sourceWidth = AverageStrokeWidth(source) * source.Transform.WidthScale;
-        uint randomState = unchecked((uint)branch.Seed) ^ 0x9E3779B9u;
-        for (int branchIndex = 0; branchIndex < branch.Count; branchIndex++)
+        for (int branchIndex = 0; branchIndex < count && allStrokes.Count < 4096; branchIndex++)
         {
-            float cellT = (branchIndex + 0.5f) / branch.Count;
+            float cellT = (branchIndex + 0.5f) / count;
             float baseT = Mathf.Lerp(branch.StartT, branch.EndT, cellT);
-            float jitterRange = (branch.EndT - branch.StartT) / branch.Count * 0.7f;
+            float jitterRange = (branch.EndT - branch.StartT) / count * 0.7f;
             float t = Mathf.Clamp(baseT + (NextRandom(ref randomState) - 0.5f) * jitterRange, branch.StartT, branch.EndT);
             SamplePolyline(path, cumulativeLengths, totalLength, t, out Vector2 anchor, out Vector2 tangent);
 
             float side = NextRandom(ref randomState) < 0.5f ? -1.0f : 1.0f;
             float angle = Mathf.DegToRad(Mathf.Lerp(branch.AngleMinDegrees, branch.AngleMaxDegrees, NextRandom(ref randomState))) * side;
-            float length = Mathf.Lerp(branch.LengthMinCm, branch.LengthMaxCm, NextRandom(ref randomState));
+            float length = Mathf.Lerp(branch.LengthMinCm, branch.LengthMaxCm, NextRandom(ref randomState)) * lengthScale;
             Vector2 direction = tangent.Rotated(angle).Normalized();
             float segmentLength = length / branch.Segments;
             CenterStrokeElement stroke = new()
             {
-                Id = $"{branch.Id}_derived_{branchIndex}",
-                Name = $"{branch.Name} {branchIndex + 1}",
+                Id = $"{branch.Id}_derived_{derivedIndex}",
+                Name = $"{branch.Name} {derivedIndex + 1}",
                 Symmetry = true,
                 Opacity = branch.Opacity
             };
+            derivedIndex++;
 
             Vector2 position = anchor;
             for (int segmentIndex = 0; segmentIndex <= branch.Segments; segmentIndex++)
@@ -304,9 +356,10 @@ public static class PolyTextureRenderer
                     position += direction * segmentLength;
                 }
             }
-            result.Add(stroke);
+            allStrokes.Add(stroke);
+            generation.Add(stroke);
         }
-        return result;
+        return generation;
     }
 
     public static List<List<Vector2>> BuildBranchPolygons(PolyTextureItem texture, BranchGeneratorElement branch)

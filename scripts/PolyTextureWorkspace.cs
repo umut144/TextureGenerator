@@ -2784,6 +2784,7 @@ public partial class PolyTextureWorkspace : Control
                     {
                         AddGeneratorInfoItem(elementItem, $"Source: {branch.SourceElementId}");
                         AddGeneratorInfoItem(elementItem, $"Branches: {branch.Count}");
+                        AddGeneratorInfoItem(elementItem, $"Depth: {branch.Depth}");
                         AddGeneratorInfoItem(elementItem, $"Seed: {branch.Seed}");
                     }
                     else if (element is MirrorGeneratorElement mirror)

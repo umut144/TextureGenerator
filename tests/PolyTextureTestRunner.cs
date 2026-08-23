@@ -21,6 +21,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
         Run("branch generator produces deterministic crack structures", TestBranchGenerator);
+        Run("branch generator recursively grows crack generations", TestRecursiveBranchGenerator);
         Run("evaluator keeps operations live", TestLiveEvaluation);
         Run("mirror evaluation reflects across its axis", TestMirror);
         Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
@@ -348,6 +349,34 @@ public partial class PolyTextureTestRunner : SceneTree
             }
         }
         Assert(hasCrack, "branch mask bake should contain crack structure");
+    }
+
+    private static void TestRecursiveBranchGenerator()
+    {
+        PolyTextureDocument document = CreateCrackDocument();
+        PolyTextureItem texture = document.Textures[0];
+        BranchGeneratorElement branch = texture.GetElement("branches") as BranchGeneratorElement;
+        branch.Count = 2;
+        branch.Depth = 3;
+        branch.ChildrenPerBranch = 2;
+        branch.DepthLengthScale = 0.5f;
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+
+        List<CenterStrokeElement> first = PolyTextureRenderer.BuildBranchStrokes(texture, branch);
+        List<CenterStrokeElement> second = PolyTextureRenderer.BuildBranchStrokes(texture, branch);
+        Equal(14, first.Count, "recursive branch count");
+        Equal(first.Count, second.Count, "recursive deterministic count");
+        Near(first[0].Points[0].Position, second[0].Points[0].Position, 0.0001f, "recursive root determinism");
+        Near(first[^1].Points[^1].Position, second[^1].Points[^1].Position, 0.0001f, "recursive leaf determinism");
+        Assert(first[2].Points[0].LeftWidth < first[0].Points[0].LeftWidth, "child crack must narrow relative to its parent generation");
+
+        string path = "user://polytexture_test_recursive_branch.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        BranchGeneratorElement loadedBranch = loaded.Textures[0].GetElement("branches") as BranchGeneratorElement;
+        Equal(3, loadedBranch.Depth, "branch depth round trip");
+        Equal(2, loadedBranch.ChildrenPerBranch, "branch children round trip");
+        Near(0.5f, loadedBranch.DepthLengthScale, 0.0001f, "branch depth length scale round trip");
     }
 
     private static void TestMirror()

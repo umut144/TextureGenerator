@@ -84,6 +84,24 @@ drawn paths while reusing the same path editing interaction.
 secondary strokes along its arc length. Seed, density, segment count, length,
 angle, width scale, and irregularity remain canonical parameters; generated
 strokes and their clipped polygons remain evaluator-owned derived data.
+Depth greater than one recursively attaches smaller child cracks to the
+previous generation. Children per branch and physical depth-length scale keep
+the fractal growth bounded; validation caps a graph at 4096 derived branches.
+
+## Tool abstraction levels
+
+PolyTexture intentionally supports tools at multiple abstraction levels:
+
+- low-level Sources, Generators, Operators, and Filters expose deterministic
+  construction parameters for technical artists and recipe authors;
+- reusable Recipes will package subgraphs, choose defaults, and expose only a
+  curated subset of those parameters;
+- higher-level domain tools may present task vocabulary such as Cracked
+  Surface or Mold Colonies while still evaluating through the same primitives.
+
+Low-level controls are therefore product foundations, not the final UX ceiling.
+A higher-level tool must compose the canonical graph rather than introduce a
+second incompatible authoring model.
 
 `Repeat Grid` consumes preceding evaluated region geometry and produces a
 deterministic grid of translated instances. Signed alternate-row offset is a

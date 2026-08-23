@@ -400,6 +400,9 @@ public static class PolyTextureValidator
         if (string.IsNullOrWhiteSpace(branch.SourceElementId)
             || branch.Seed < 0 || branch.Count < 1 || branch.Count > 4096
             || branch.Segments < 1 || branch.Segments > 32
+            || branch.Depth < 1 || branch.Depth > 5
+            || branch.ChildrenPerBranch < 1 || branch.ChildrenPerBranch > 4
+            || CountGeneratedBranches(branch.Count, branch.ChildrenPerBranch, branch.Depth) > 4096
             || !float.IsFinite(branch.StartT) || !float.IsFinite(branch.EndT)
             || branch.StartT < 0.0f || branch.EndT > 1.0f || branch.StartT > branch.EndT
             || !float.IsFinite(branch.LengthMinCm) || !float.IsFinite(branch.LengthMaxCm)
@@ -407,12 +410,25 @@ public static class PolyTextureValidator
             || !float.IsFinite(branch.AngleMinDegrees) || !float.IsFinite(branch.AngleMaxDegrees)
             || branch.AngleMinDegrees < 0.0f || branch.AngleMaxDegrees < branch.AngleMinDegrees || branch.AngleMaxDegrees > 180.0f
             || !float.IsFinite(branch.WidthScale) || branch.WidthScale <= 0.0f
-            || !float.IsFinite(branch.Irregularity) || branch.Irregularity < 0.0f || branch.Irregularity > 1.0f)
+            || !float.IsFinite(branch.Irregularity) || branch.Irregularity < 0.0f || branch.Irregularity > 1.0f
+            || !float.IsFinite(branch.DepthLengthScale) || branch.DepthLengthScale <= 0.0f || branch.DepthLengthScale > 1.0f)
         {
             error = $"{path} contains invalid branch generator values";
             return false;
         }
         return true;
+    }
+
+    private static long CountGeneratedBranches(int rootCount, int childrenPerBranch, int depth)
+    {
+        long total = 0;
+        long generation = rootCount;
+        for (int level = 1; level <= depth; level++)
+        {
+            total += generation;
+            generation *= childrenPerBranch;
+        }
+        return total;
     }
 
     private static bool ValidateCenterStroke(CenterStrokeElement centerStroke, string path, out string error)
@@ -868,6 +884,8 @@ public static class PolyTextureValidator
             || !RequireInt(branch, "seed", out int seed, out error, path)
             || !RequireInt(branch, "count", out int count, out error, path)
             || !RequireInt(branch, "segments", out int segments, out error, path)
+            || !RequireInt(branch, "depth", out int depth, out error, path)
+            || !RequireInt(branch, "children_per_branch", out int childrenPerBranch, out error, path)
             || !RequireNumber(branch, "start_t", out float startT, out error, path)
             || !RequireNumber(branch, "end_t", out float endT, out error, path)
             || !RequireNumber(branch, "length_min_cm", out float lengthMin, out error, path)
@@ -876,16 +894,20 @@ public static class PolyTextureValidator
             || !RequireNumber(branch, "angle_max_degrees", out float angleMax, out error, path)
             || !RequireNumber(branch, "width_scale", out float widthScale, out error, path)
             || !RequireNumber(branch, "irregularity", out float irregularity, out error, path)
+            || !RequireNumber(branch, "depth_length_scale", out float depthLengthScale, out error, path)
             || !RequireBool(branch, "render_source", out _, out error, path))
         {
             return false;
         }
         if (string.IsNullOrWhiteSpace(sourceId) || opacity < 0.0f || opacity > 1.0f
             || seed < 0 || count < 1 || count > 4096 || segments < 1 || segments > 32
+            || depth < 1 || depth > 5 || childrenPerBranch < 1 || childrenPerBranch > 4
+            || CountGeneratedBranches(count, childrenPerBranch, depth) > 4096
             || startT < 0.0f || endT > 1.0f || startT > endT
             || lengthMin <= 0.0f || lengthMax < lengthMin
             || angleMin < 0.0f || angleMax < angleMin || angleMax > 180.0f
-            || widthScale <= 0.0f || irregularity < 0.0f || irregularity > 1.0f)
+            || widthScale <= 0.0f || irregularity < 0.0f || irregularity > 1.0f
+            || !float.IsFinite(depthLengthScale) || depthLengthScale <= 0.0f || depthLengthScale > 1.0f)
         {
             error = $"{path} contains invalid branch generator values";
             return false;

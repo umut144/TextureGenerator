@@ -234,6 +234,8 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"seed\": {branch.Seed},");
         builder.AppendLine($"{indent}  \"count\": {branch.Count},");
         builder.AppendLine($"{indent}  \"segments\": {branch.Segments},");
+        builder.AppendLine($"{indent}  \"depth\": {branch.Depth},");
+        builder.AppendLine($"{indent}  \"children_per_branch\": {branch.ChildrenPerBranch},");
         builder.AppendLine($"{indent}  \"start_t\": {Number(branch.StartT)},");
         builder.AppendLine($"{indent}  \"end_t\": {Number(branch.EndT)},");
         builder.AppendLine($"{indent}  \"length_min_cm\": {Number(branch.LengthMinCm)},");
@@ -242,6 +244,7 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"angle_max_degrees\": {Number(branch.AngleMaxDegrees)},");
         builder.AppendLine($"{indent}  \"width_scale\": {Number(branch.WidthScale)},");
         builder.AppendLine($"{indent}  \"irregularity\": {Number(branch.Irregularity)},");
+        builder.AppendLine($"{indent}  \"depth_length_scale\": {Number(branch.DepthLengthScale)},");
         builder.AppendLine($"{indent}  \"render_source\": {JsonBool(branch.RenderSource)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
@@ -556,6 +559,8 @@ public static class PolyTextureStore
             Seed = ReadInt(branch, "seed", 1),
             Count = ReadInt(branch, "count", 10),
             Segments = ReadInt(branch, "segments", 3),
+            Depth = ReadInt(branch, "depth", 1),
+            ChildrenPerBranch = ReadInt(branch, "children_per_branch", 2),
             StartT = ReadFloat(branch, "start_t", 0.08f),
             EndT = ReadFloat(branch, "end_t", 0.92f),
             LengthMinCm = ReadFloat(branch, "length_min_cm", 18.0f),
@@ -564,6 +569,7 @@ public static class PolyTextureStore
             AngleMaxDegrees = ReadFloat(branch, "angle_max_degrees", 65.0f),
             WidthScale = ReadFloat(branch, "width_scale", 0.45f),
             Irregularity = ReadFloat(branch, "irregularity", 0.25f),
+            DepthLengthScale = ReadFloat(branch, "depth_length_scale", 0.55f),
             RenderSource = ReadBool(branch, "render_source", true)
         };
     }
