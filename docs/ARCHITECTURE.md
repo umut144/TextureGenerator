@@ -118,10 +118,11 @@ inward edge gradient. Radius is authored in centimeters and converted using
 the Surface Domain texel spacing at evaluation time; Exponent controls the
 gradient curve without changing canonical vector geometry.
 
-Selecting a ScalarField Filter automatically shows an opaque, auto-normalized
-heatmap of that intermediate field. This is a debug visualization only: it
-improves feedback for thin or low-valued fields but never changes output values
-or exported images.
+Selecting a ScalarField Filter automatically shows an opaque,
+contrast-enhanced heatmap of that intermediate field. A fixed display curve
+keeps thin or low-valued fields visible without discarding their absolute
+magnitude, so uniform changes remain observable. This is a debug visualization
+only and never changes output values or exported images.
 
 ## Format policy
 

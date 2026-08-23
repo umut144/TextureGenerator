@@ -513,6 +513,7 @@ public partial class PolyTextureTestRunner : SceneTree
         bool hasGradient = false;
         bool hasDebugSignal = false;
         float wideRadiusSum = 0.0f;
+        float wideDebugSum = 0.0f;
         for (int y = 0; y < image.GetHeight(); y++)
         {
             for (int x = 0; x < image.GetWidth(); x++)
@@ -523,6 +524,7 @@ public partial class PolyTextureTestRunner : SceneTree
                 hasGradient |= value > 0.0001f && value < 0.999f;
                 Color debugColor = debugPreview.GetPixel(x, y);
                 hasDebugSignal |= debugColor.B > 0.2f || debugColor.R > 0.2f;
+                wideDebugSum += debugColor.R + debugColor.G + debugColor.B;
             }
         }
         Assert(hasBackground && hasGradient && hasDebugSignal, "edge falloff debug should expose background and a soft physical gradient");
@@ -530,14 +532,19 @@ public partial class PolyTextureTestRunner : SceneTree
         falloff.RadiusCm = 3.0f;
         Image narrowRadius = PolyTextureBakeService.BakeElementScalar(texture, falloff.Id, 128, 128);
         float narrowRadiusSum = 0.0f;
+        Image narrowDebug = PolyTextureBakeService.CreateScalarDebugPreview(narrowRadius);
+        float narrowDebugSum = 0.0f;
         for (int y = 0; y < narrowRadius.GetHeight(); y++)
         {
             for (int x = 0; x < narrowRadius.GetWidth(); x++)
             {
                 narrowRadiusSum += narrowRadius.GetPixel(x, y).R;
+                Color debugColor = narrowDebug.GetPixel(x, y);
+                narrowDebugSum += debugColor.R + debugColor.G + debugColor.B;
             }
         }
         Assert(Mathf.Abs(narrowRadiusSum - wideRadiusSum) > 0.1f, "falloff radius must visibly change the scalar field");
+        Assert(Mathf.Abs(narrowDebugSum - wideDebugSum) > 0.1f, "debug preview must preserve falloff magnitude changes");
         falloff.RadiusCm = 12.0f;
 
         string path = "user://polytexture_test_edge_falloff.polytexture.json";

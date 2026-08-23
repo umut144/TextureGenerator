@@ -575,7 +575,7 @@ public partial class PolyTextureWorkspace : Control
         else if (_document.SelectionKind == PolyTextureSelectionKind.Element
             && _document.ActiveElement is InvertFilterElement or EdgeFalloffFilterElement)
         {
-            _elementActionBar.AddChild(new Label { Text = "Scalar Debug Preview (auto-normalized)" });
+            _elementActionBar.AddChild(new Label { Text = "Scalar Debug Preview (contrast-enhanced)" });
         }
         else if (_document.SelectionKind == PolyTextureSelectionKind.Point
             && _document.ActivePoint is CenterStrokePoint point)

@@ -69,19 +69,6 @@ public static class PolyTextureBakeService
             return preview;
         }
 
-        float maximum = 0.0f;
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                maximum = Mathf.Max(maximum, scalar.GetPixel(x, y).R);
-            }
-        }
-        if (maximum <= 0.000001f)
-        {
-            return preview;
-        }
-
         Color low = new(0.34f, 0.08f, 0.52f);
         Color middle = new(0.04f, 0.78f, 0.92f);
         Color high = new(1.0f, 0.92f, 0.22f);
@@ -89,14 +76,15 @@ public static class PolyTextureBakeService
         {
             for (int x = 0; x < width; x++)
             {
-                float normalized = Mathf.Clamp(scalar.GetPixel(x, y).R / maximum, 0.0f, 1.0f);
-                if (normalized <= 0.000001f)
+                float value = Mathf.Clamp(scalar.GetPixel(x, y).R, 0.0f, 1.0f);
+                if (value <= 0.000001f)
                 {
                     continue;
                 }
-                Color color = normalized < 0.5f
-                    ? low.Lerp(middle, normalized * 2.0f)
-                    : middle.Lerp(high, (normalized - 0.5f) * 2.0f);
+                float displayValue = Mathf.Pow(value, 0.35f);
+                Color color = displayValue < 0.5f
+                    ? low.Lerp(middle, displayValue * 2.0f)
+                    : middle.Lerp(high, (displayValue - 0.5f) * 2.0f);
                 preview.SetPixel(x, y, color);
             }
         }
