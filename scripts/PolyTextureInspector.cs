@@ -714,12 +714,13 @@ public partial class PolyTextureInspector : PanelContainer
 
     private static SpinBox CreateSpinBox(double minValue, double maxValue, double step)
     {
+        double normalizedStep = PolyTextureUiDefaults.NormalizeSpinStep(step);
         return new SpinBox
         {
             MinValue = minValue,
             MaxValue = maxValue,
-            Step = step,
-            Rounded = step >= 1.0,
+            Step = normalizedStep,
+            Rounded = normalizedStep >= 1.0,
             SizeFlagsHorizontal = SizeFlags.ExpandFill
         };
     }

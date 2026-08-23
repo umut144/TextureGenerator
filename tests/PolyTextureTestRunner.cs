@@ -11,6 +11,7 @@ public partial class PolyTextureTestRunner : SceneTree
     {
         Run("schema 1 is the only accepted document contract", TestSchemaContract);
         Run("save filename follows the document name", TestDocumentSaveFileName);
+        Run("fine spin controls use practical arrow increments", TestFineSpinStep);
         Run("document round trip preserves names and references", TestRoundTrip);
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
@@ -82,6 +83,13 @@ public partial class PolyTextureTestRunner : SceneTree
     {
         Equal("egg_ghost.polytexture.json", PolyTextureWorkspace.BuildDefaultDocumentFileName("Egg Ghost"), "named document filename");
         Equal("untitled.polytexture.json", PolyTextureWorkspace.BuildDefaultDocumentFileName("   "), "empty document filename");
+    }
+
+    private static void TestFineSpinStep()
+    {
+        Near(0.1f, (float)PolyTextureUiDefaults.NormalizeSpinStep(0.01), 0.0001f, "hundredth step normalization");
+        Near(0.1f, (float)PolyTextureUiDefaults.NormalizeSpinStep(0.05), 0.0001f, "twentieth step normalization");
+        Near(1.0f, (float)PolyTextureUiDefaults.NormalizeSpinStep(1.0), 0.0001f, "integer step preservation");
     }
 
     private static void TestRoundTrip()

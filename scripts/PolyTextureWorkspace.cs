@@ -351,7 +351,7 @@ public partial class PolyTextureWorkspace : Control
         {
             MinValue = 0.01,
             MaxValue = 100000.0,
-            Step = 0.01,
+            Step = PolyTextureUiDefaults.MinimumFineSpinStep,
             Value = _drawPointWidthCm,
             CustomMinimumSize = new Vector2(92, 0)
         };
@@ -809,7 +809,7 @@ public partial class PolyTextureWorkspace : Control
         {
             MinValue = -8192,
             MaxValue = 8192,
-            Step = 0.01,
+            Step = PolyTextureUiDefaults.MinimumFineSpinStep,
             Rounded = false,
             Value = value,
             CustomMinimumSize = new Vector2(72, 0)
@@ -830,7 +830,7 @@ public partial class PolyTextureWorkspace : Control
         {
             MinValue = -8192,
             MaxValue = 8192,
-            Step = 0.01,
+            Step = PolyTextureUiDefaults.MinimumFineSpinStep,
             Rounded = false,
             Value = value,
             CustomMinimumSize = new Vector2(72, 0)
@@ -847,12 +847,13 @@ public partial class PolyTextureWorkspace : Control
     private void AddSweepDraftSpinBox(string label, double value, double minValue, double maxValue, double step, Action<double> apply)
     {
         _elementActionBar.AddChild(new Label { Text = label });
+        double normalizedStep = PolyTextureUiDefaults.NormalizeSpinStep(step);
         SpinBox spinBox = new()
         {
             MinValue = minValue,
             MaxValue = maxValue,
-            Step = step,
-            Rounded = step >= 1.0,
+            Step = normalizedStep,
+            Rounded = normalizedStep >= 1.0,
             Value = value,
             CustomMinimumSize = new Vector2(72, 0)
         };
@@ -1027,7 +1028,7 @@ public partial class PolyTextureWorkspace : Control
         {
             MinValue = minValue,
             MaxValue = maxValue,
-            Step = 0.01,
+            Step = PolyTextureUiDefaults.MinimumFineSpinStep,
             Value = value,
             CustomMinimumSize = new Vector2(86, 0)
         };
@@ -1039,7 +1040,7 @@ public partial class PolyTextureWorkspace : Control
         {
             MinValue = 0.01,
             MaxValue = 100000,
-            Step = 0.01,
+            Step = PolyTextureUiDefaults.MinimumFineSpinStep,
             Value = value,
             CustomMinimumSize = new Vector2(100, 0)
         };
