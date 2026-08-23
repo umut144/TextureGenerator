@@ -14,6 +14,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("fine spin controls use practical arrow increments", TestFineSpinStep);
         Run("document round trip preserves names and references", TestRoundTrip);
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
+        Run("selected operations bind outputs without helper bounds", TestSelectedOutputBinding);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
         Run("ellipse regions remain parametric across round trips", TestEllipseRegionRoundTrip);
@@ -142,6 +143,18 @@ public partial class PolyTextureTestRunner : SceneTree
         Equal("Leaf Veins", loaded.Textures[0].GetOutput("veins").Name, "mask name");
         Equal(PolyTextureSelectionKind.Output, loaded.SelectionKind, "output selection kind");
         Equal("height", loaded.ActiveOutputId, "active output id");
+    }
+
+    private static void TestSelectedOutputBinding()
+    {
+        PolyTextureDocument document = CreateScatterDocument();
+        List<string> selectedSources = PolyTextureWorkspace.ResolveOutputSourceIds(document);
+        Equal(1, selectedSources.Count, "selected scatter output source count");
+        Equal("scatter", selectedSources[0], "selected scatter output source");
+
+        document.SelectionKind = PolyTextureSelectionKind.Texture;
+        List<string> visibleSources = PolyTextureWorkspace.ResolveOutputSourceIds(document);
+        Assert(visibleSources.Contains("tomato_bounds") && visibleSources.Contains("scatter"), "texture selection should still bind the visible graph");
     }
 
     private static void TestSweepDeterminism()

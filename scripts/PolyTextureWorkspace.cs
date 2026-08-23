@@ -2469,24 +2469,17 @@ public partial class PolyTextureWorkspace : Control
             return;
         }
 
-        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
         PolyTextureOutputBinding binding = new()
         {
             Id = EnsureUniqueOutputId(texture, kind == PolyTextureOutputKind.Height ? "height" : "mask"),
             Name = kind == PolyTextureOutputKind.Height ? "Height" : $"Mask {texture.Outputs.FindAll(output => output.Kind == PolyTextureOutputKind.Mask).Count + 1}",
             Kind = kind
         };
-        if (_document.ActiveElement is InvertFilterElement or EdgeFalloffFilterElement)
+        foreach (string sourceId in ResolveOutputSourceIds(_document))
         {
-            binding.SourceElementIds.Add(_document.ActiveElement.Id);
+            binding.SourceElementIds.Add(sourceId);
         }
-        else foreach (PolyTextureElement element in texture.Elements)
-        {
-            if (element.Enabled && !evaluation.HiddenSourceIds.Contains(element.Id) && evaluation.GetGeometry(element.Id).Count > 0)
-            {
-                binding.SourceElementIds.Add(element.Id);
-            }
-        }
+
         if (binding.SourceElementIds.Count == 0)
         {
             SetStatus("The visible graph has no geometry to bind.");
@@ -2501,6 +2494,34 @@ public partial class PolyTextureWorkspace : Control
         _document.SelectionKind = PolyTextureSelectionKind.Output;
         RefreshAll();
         MarkChanged($"{binding.Name} output added.");
+    }
+
+    public static List<string> ResolveOutputSourceIds(PolyTextureDocument document)
+    {
+        List<string> sourceIds = new();
+        PolyTextureItem texture = document?.ActiveTexture;
+        if (texture == null)
+        {
+            return sourceIds;
+        }
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        if (document.SelectionKind == PolyTextureSelectionKind.Element && document.ActiveElement?.Enabled == true)
+        {
+            PolyTextureElement active = document.ActiveElement;
+            if (active is InvertFilterElement or EdgeFalloffFilterElement || evaluation.GetGeometry(active.Id).Count > 0)
+            {
+                sourceIds.Add(active.Id);
+                return sourceIds;
+            }
+        }
+        foreach (PolyTextureElement element in texture.Elements)
+        {
+            if (element.Enabled && !evaluation.HiddenSourceIds.Contains(element.Id) && evaluation.GetGeometry(element.Id).Count > 0)
+            {
+                sourceIds.Add(element.Id);
+            }
+        }
+        return sourceIds;
     }
 
     private void FitView()

@@ -71,6 +71,10 @@ bindings additionally declare their physical amplitude in centimeters. Mask
 bindings use their mutable display name as the artist-facing semantic label;
 their stable ID remains the technical identity.
 
+Creating an output while an element is selected binds that element alone. This
+keeps helper inputs such as Scatter bounds out of the semantic result. Creating
+an output from the texture selection instead binds the complete visible graph.
+
 The current PNG bake writes one grayscale file per scalar output. A Height
 binding may additionally export a tangent-space Normal image derived from the
 same rasterized Height field. Bake files are derived data and are not embedded
