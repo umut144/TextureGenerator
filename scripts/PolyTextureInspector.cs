@@ -13,6 +13,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _outputInspector;
     private VBoxContainer _regionInspector;
     private VBoxContainer _repeatInspector;
+    private VBoxContainer _filterInspector;
 
     private LineEdit _textureNameLineEdit;
     private OptionButton _textureOriginOptionButton;
@@ -85,6 +86,7 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _repeatStepXSpinBox;
     private SpinBox _repeatStepYSpinBox;
     private SpinBox _repeatRowOffsetSpinBox;
+    private Label _filterSourceLabel;
 
     public event Action DocumentChanged;
 
@@ -119,6 +121,7 @@ public partial class PolyTextureInspector : PanelContainer
         PolyTextureOutputBinding output = _document.ActiveOutput;
         RectangleRegionElement region = selectedElement as RectangleRegionElement;
         RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
+        InvertFilterElement invert = selectedElement as InvertFilterElement;
 
         _textureInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Texture;
         _elementInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element;
@@ -127,6 +130,7 @@ public partial class PolyTextureInspector : PanelContainer
         _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
         _regionInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && region != null;
         _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
+        _filterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && invert != null;
         _textureNameLineEdit.Editable = hasTexture;
         _textureOriginOptionButton.Disabled = !hasTexture;
         _domainWidthSpinBox.Editable = hasTexture;
@@ -300,6 +304,10 @@ public partial class PolyTextureInspector : PanelContainer
             _repeatStepXSpinBox.Value = repeat.StepXCm;
             _repeatStepYSpinBox.Value = repeat.StepYCm;
             _repeatRowOffsetSpinBox.Value = repeat.AlternateRowOffsetXCm;
+        }
+        if (invert != null)
+        {
+            _filterSourceLabel.Text = invert.SourceElementId;
         }
 
         _refreshing = false;
@@ -580,6 +588,10 @@ public partial class PolyTextureInspector : PanelContainer
         _repeatRowOffsetSpinBox = CreateSpinBox(-100000, 100000, 0.01);
         AddField(_repeatInspector, "Alternate Row Offset X (cm)", _repeatRowOffsetSpinBox);
         _repeatRowOffsetSpinBox.ValueChanged += value => ApplyRepeatChange(repeat => repeat.AlternateRowOffsetXCm = (float)value);
+
+        _filterInspector = CreateSection(stack, "Invert Filter");
+        _filterSourceLabel = new Label();
+        AddField(_filterInspector, "Source", _filterSourceLabel);
     }
 
     private static VBoxContainer CreateSection(VBoxContainer stack, string title)

@@ -37,6 +37,7 @@ public partial class PolyTextureWorkspace : Control
     private const int GenerateSweepMenuId = 1;
     private const int GenerateRepeatGridMenuId = 2;
     private const int OperatorMirrorMenuId = 1;
+    private const int FilterInvertMenuId = 1;
     private const int GuidePointMenuId = 1;
     private const int GuideAxisMenuId = 2;
     private const int RectangleRegionMenuId = 3;
@@ -362,7 +363,10 @@ public partial class PolyTextureWorkspace : Control
         _operatorMenuButton.Disabled = true;
         toolbar.AddChild(_operatorMenuButton);
 
-        _filterMenuButton = new MenuButton { Text = "Filter", TooltipText = "Filters will be added by the first field-output vertical slices." };
+        _filterMenuButton = new MenuButton { Text = "Filter" };
+        PopupMenu filterPopup = _filterMenuButton.GetPopup();
+        filterPopup.AddItem("Invert", FilterInvertMenuId);
+        filterPopup.IdPressed += OnFilterMenuPressed;
         _filterMenuButton.Disabled = true;
         toolbar.AddChild(_filterMenuButton);
 
@@ -1422,6 +1426,40 @@ public partial class PolyTextureWorkspace : Control
         }
     }
 
+    private void OnFilterMenuPressed(long id)
+    {
+        if ((int)id == FilterInvertMenuId)
+        {
+            AddInvertFilter();
+        }
+    }
+
+    private void AddInvertFilter()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureElement source = _document?.ActiveElement;
+        if (texture == null || source == null)
+        {
+            SetStatus("Select a source or operation before adding Invert.");
+            return;
+        }
+
+        InvertFilterElement invert = new()
+        {
+            Id = EnsureUniqueElementId(texture, "invert"),
+            Name = "Invert",
+            SourceElementId = source.Id
+        };
+        texture.Elements.Add(invert);
+        _document.ActiveElementId = invert.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Invert filter added.");
+    }
+
     private void OnGuideMenuPressed(long id)
     {
         if ((int)id == GuidePointMenuId)
@@ -1571,6 +1609,13 @@ public partial class PolyTextureWorkspace : Control
             _operatorMenuButton.Disabled = _sweepCreationState != SweepCreationState.None
                 || _mirrorCreationState != MirrorCreationState.None
                 || !CanBeginMirrorCreation();
+        }
+        if (_filterMenuButton != null)
+        {
+            _filterMenuButton.Disabled = _sweepCreationState != SweepCreationState.None
+                || _mirrorCreationState != MirrorCreationState.None
+                || _document?.SelectionKind != PolyTextureSelectionKind.Element
+                || _document.ActiveElement == null;
         }
     }
 
@@ -2216,7 +2261,11 @@ public partial class PolyTextureWorkspace : Control
             Name = kind == PolyTextureOutputKind.Height ? "Height" : $"Mask {texture.Outputs.FindAll(output => output.Kind == PolyTextureOutputKind.Mask).Count + 1}",
             Kind = kind
         };
-        foreach (PolyTextureElement element in texture.Elements)
+        if (_document.ActiveElement is InvertFilterElement activeFilter)
+        {
+            binding.SourceElementIds.Add(activeFilter.Id);
+        }
+        else foreach (PolyTextureElement element in texture.Elements)
         {
             if (element.Enabled && !evaluation.HiddenSourceIds.Contains(element.Id) && evaluation.GetGeometry(element.Id).Count > 0)
             {
@@ -2516,6 +2565,7 @@ public partial class PolyTextureWorkspace : Control
                 TreeItem elementsGroup = CreateOutlinerGroup(textureItem, "Sources");
                 TreeItem generatorsGroup = CreateOutlinerGroup(textureItem, "Generators");
                 TreeItem operatorsGroup = CreateOutlinerGroup(textureItem, "Operators");
+                TreeItem filtersGroup = CreateOutlinerGroup(textureItem, "Filters");
                 TreeItem guidesGroup = CreateOutlinerGroup(textureItem, "Guides");
                 TreeItem outputsGroup = CreateOutlinerGroup(textureItem, "Outputs");
                 foreach (PolyTextureElement element in texture.Elements)
@@ -2528,6 +2578,10 @@ public partial class PolyTextureWorkspace : Control
                     else if (element is MirrorGeneratorElement)
                     {
                         parent = operatorsGroup;
+                    }
+                    else if (element is InvertFilterElement)
+                    {
+                        parent = filtersGroup;
                     }
                     TreeItem elementItem = _outlinerTree.CreateItem(parent);
                     if (elementItem == null)
@@ -2589,6 +2643,10 @@ public partial class PolyTextureWorkspace : Control
                     {
                         AddGeneratorInfoItem(elementItem, $"Source: {mirror.SourceElementId}");
                         AddGeneratorInfoItem(elementItem, $"Axis: {mirror.AxisGuideId}");
+                    }
+                    else if (element is InvertFilterElement invert)
+                    {
+                        AddGeneratorInfoItem(elementItem, $"Source: {invert.SourceElementId}");
                     }
                 }
 

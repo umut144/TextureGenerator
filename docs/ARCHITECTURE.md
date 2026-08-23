@@ -79,6 +79,10 @@ are always derived by the evaluator.
 deterministic grid of translated instances. Signed alternate-row offset is a
 general parameter; a half-step offset is merely the brick-wall configuration.
 
+`Invert` is the first `ScalarField` Filter. It evaluates its preceding input at
+bake resolution and returns the exact scalar complement. The source vector
+graph remains canonical and unchanged.
+
 ## Format policy
 
 The procedural document format starts at schema 1. Unsupported schema versions

@@ -149,6 +149,10 @@ public static class PolyTextureStore
         {
             AppendRepeatGrid(builder, repeat, indent, suffix);
         }
+        else if (element is InvertFilterElement invert)
+        {
+            AppendInvert(builder, invert, indent, suffix);
+        }
         else if (element is SweepGeneratorElement sweep)
         {
             AppendSweep(builder, sweep, indent, suffix);
@@ -161,6 +165,18 @@ public static class PolyTextureStore
         {
             AppendCenterStroke(builder, centerStroke, includeBezierData: false, indent, suffix);
         }
+    }
+
+    private static void AppendInvert(StringBuilder builder, InvertFilterElement invert, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(invert.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(invert.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{InvertFilterElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(invert.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(invert.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(invert.SourceElementId)}\"");
+        builder.AppendLine($"{indent}}}{suffix}");
     }
 
     private static void AppendRepeatGrid(StringBuilder builder, RepeatGridGeneratorElement repeat, string indent, string suffix)
@@ -404,6 +420,11 @@ public static class PolyTextureStore
             return ReadRepeatGrid(element);
         }
 
+        if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadInvert(element);
+        }
+
         if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadMirror(element);
@@ -412,6 +433,18 @@ public static class PolyTextureStore
         return new CenterStrokeElement
         {
             Id = ReadString(element, "id", "center_stroke01")
+        };
+    }
+
+    private static InvertFilterElement ReadInvert(Godot.Collections.Dictionary invert)
+    {
+        return new InvertFilterElement
+        {
+            Id = ReadString(invert, "id", "invert"),
+            Name = ReadString(invert, "name", "Invert"),
+            Enabled = ReadBool(invert, "enabled", true),
+            Opacity = ReadFloat(invert, "opacity", 0.86f),
+            SourceElementId = ReadString(invert, "source_element_id", string.Empty)
         };
     }
 

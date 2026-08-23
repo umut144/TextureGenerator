@@ -21,6 +21,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("mirror consumes live generator geometry", TestMirrorGeneratorChain);
         Run("height and mask baking is deterministic", TestDeterministicBake);
         Run("normal maps derive only from height", TestNormalDerivation);
+        Run("invert filter derives a complementary mortar field", TestInvertMortarField);
         Run("display rename preserves stable references", TestRenamePreservesReferences);
         Run("dependency-aware deletion blocks used inputs", TestDependencyDeletion);
         Run("validator rejects missing generator inputs", TestMissingReferenceValidation);
@@ -248,6 +249,60 @@ public partial class PolyTextureTestRunner : SceneTree
         Equal("source", source.Id, "stable source id");
         Equal("source", sweep.SourceElementId, "stable sweep reference");
         Assert(PolyTextureValidator.Validate(document, out string error), error);
+    }
+
+    private static void TestInvertMortarField()
+    {
+        PolyTextureDocument document = CreateWallDocument();
+        PolyTextureItem texture = document.Textures[0];
+        InvertFilterElement invert = new()
+        {
+            Id = "invert",
+            Name = "Mortar Field",
+            SourceElementId = "repeat"
+        };
+        texture.Elements.Add(invert);
+        PolyTextureOutputBinding bricks = new()
+        {
+            Id = "bricks",
+            Name = "Bricks",
+            Kind = PolyTextureOutputKind.Mask
+        };
+        bricks.SourceElementIds.Add("repeat");
+        texture.Outputs.Add(bricks);
+        PolyTextureOutputBinding mortar = new()
+        {
+            Id = "mortar",
+            Name = "Mortar",
+            Kind = PolyTextureOutputKind.Mask
+        };
+        mortar.SourceElementIds.Add(invert.Id);
+        texture.Outputs.Add(mortar);
+
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+        Image brickImage = PolyTextureBakeService.BakeScalar(texture, bricks, 96, 64);
+        Image mortarImage = PolyTextureBakeService.BakeScalar(texture, mortar, 96, 64);
+        bool foundBrick = false;
+        bool foundMortar = false;
+        for (int y = 0; y < brickImage.GetHeight(); y++)
+        {
+            for (int x = 0; x < brickImage.GetWidth(); x++)
+            {
+                float brickValue = brickImage.GetPixel(x, y).R;
+                float mortarValue = mortarImage.GetPixel(x, y).R;
+                Near(1.0f, brickValue + mortarValue, 0.01f, $"complementary field {x},{y}");
+                foundBrick |= brickValue > 0.5f;
+                foundMortar |= mortarValue > 0.5f;
+            }
+        }
+        Assert(foundBrick && foundMortar, "wall fields should contain bricks and mortar");
+
+        string path = "user://polytexture_test_wall.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        InvertFilterElement loadedInvert = loaded.Textures[0].GetElement("invert") as InvertFilterElement;
+        Assert(loadedInvert != null, "invert filter missing after round trip");
+        Equal("repeat", loadedInvert.SourceElementId, "invert source round trip");
     }
 
     private static void TestDeterministicBake()

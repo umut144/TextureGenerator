@@ -62,6 +62,10 @@ public static class PolyTextureEvaluator
                 result.GeometryByElementId[mirror.Id] = polygons;
                 result.LiveMirrors.Add(mirror);
             }
+            else if (operation is InvertFilterElement)
+            {
+                result.GeometryByElementId[operation.Id] = new List<List<Vector2>>();
+            }
         }
 
         return result;

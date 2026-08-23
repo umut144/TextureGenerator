@@ -206,6 +206,14 @@ public static class PolyTextureValidator
                         return false;
                     }
                 }
+                else if (element is InvertFilterElement invert)
+                {
+                    if (!evaluatedElementIds.Contains(invert.SourceElementId))
+                    {
+                        error = $"{path}.elements[{element.Id}] must reference a preceding field source";
+                        return false;
+                    }
+                }
                 evaluatedElementIds.Add(element.Id);
             }
         }
@@ -282,6 +290,12 @@ public static class PolyTextureValidator
 
         if (element is RepeatGridGeneratorElement repeat && !ValidateRepeatGrid(repeat, path, out error))
         {
+            return false;
+        }
+
+        if (element is InvertFilterElement invert && string.IsNullOrWhiteSpace(invert.SourceElementId))
+        {
+            error = $"{path}.source_element_id is required";
             return false;
         }
 
@@ -584,6 +598,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateInvertDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateMirrorDictionary(element, elementPath, out error))
@@ -767,6 +788,22 @@ public static class PolyTextureValidator
             || stepX <= 0.0f || stepY <= 0.0f)
         {
             error = $"{path} contains invalid repeat grid values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateInvertDictionary(Godot.Collections.Dictionary invert, string path, out string error)
+    {
+        if (!RequireBool(invert, "enabled", out _, out error, path)
+            || !RequireNumber(invert, "opacity", out float opacity, out error, path)
+            || !RequireString(invert, "source_element_id", out string sourceId, out error, path))
+        {
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(sourceId) || !float.IsFinite(opacity) || opacity < 0.0f || opacity > 1.0f)
+        {
+            error = $"{path} contains invalid invert filter values";
             return false;
         }
         return true;

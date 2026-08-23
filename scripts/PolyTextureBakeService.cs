@@ -16,12 +16,27 @@ public static class PolyTextureBakeService
         }
 
         PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
-        float value = Mathf.Clamp(output.Value, 0.0f, 1.0f);
+        Image combined = Image.CreateEmpty(width, height, false, Image.Format.L8);
+        combined.Fill(Colors.Black);
         foreach (string sourceId in output.SourceElementIds)
         {
-            foreach (List<Vector2> polygon in evaluation.GetGeometry(sourceId))
+            Image sourceField = EvaluateElementField(texture, evaluation, sourceId, width, height, new HashSet<string>());
+            for (int y = 0; y < height; y++)
             {
-                RasterizePolygon(image, polygon, texture.DomainWidthCm, texture.DomainHeightCm, value);
+                for (int x = 0; x < width; x++)
+                {
+                    float value = Mathf.Max(combined.GetPixel(x, y).R, sourceField.GetPixel(x, y).R);
+                    combined.SetPixel(x, y, new Color(value, value, value));
+                }
+            }
+        }
+        float outputValue = Mathf.Clamp(output.Value, 0.0f, 1.0f);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float value = combined.GetPixel(x, y).R * outputValue;
+                image.SetPixel(x, y, new Color(value, value, value));
             }
         }
         return image;
@@ -74,6 +89,39 @@ public static class PolyTextureBakeService
             DirAccess.MakeDirRecursiveAbsolute(directory);
         }
         return image.SavePng(absolutePath);
+    }
+
+    private static Image EvaluateElementField(PolyTextureItem texture, PolyTextureEvaluationResult evaluation, string elementId, int width, int height, HashSet<string> activeIds)
+    {
+        Image image = Image.CreateEmpty(width, height, false, Image.Format.L8);
+        image.Fill(Colors.Black);
+        if (!activeIds.Add(elementId))
+        {
+            return image;
+        }
+
+        PolyTextureElement element = texture.GetElement(elementId);
+        if (element is InvertFilterElement invert && invert.Enabled)
+        {
+            Image source = EvaluateElementField(texture, evaluation, invert.SourceElementId, width, height, activeIds);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float value = 1.0f - source.GetPixel(x, y).R;
+                    image.SetPixel(x, y, new Color(value, value, value));
+                }
+            }
+        }
+        else if (element?.Enabled == true)
+        {
+            foreach (List<Vector2> polygon in evaluation.GetGeometry(elementId))
+            {
+                RasterizePolygon(image, polygon, texture.DomainWidthCm, texture.DomainHeightCm, 1.0f);
+            }
+        }
+        activeIds.Remove(elementId);
+        return image;
     }
 
     private static void RasterizePolygon(Image image, List<Vector2> polygon, float domainWidthCm, float domainHeightCm, float value)
