@@ -42,6 +42,67 @@ public static class PolyTextureBakeService
         return image;
     }
 
+    public static Image BakeElementScalar(PolyTextureItem texture, string elementId, int widthPx, int heightPx)
+    {
+        int width = Mathf.Max(1, widthPx);
+        int height = Mathf.Max(1, heightPx);
+        Image empty = Image.CreateEmpty(width, height, false, Image.Format.L8);
+        empty.Fill(Colors.Black);
+        if (texture == null || string.IsNullOrWhiteSpace(elementId)
+            || texture.DomainWidthCm <= 0.0f || texture.DomainHeightCm <= 0.0f)
+        {
+            return empty;
+        }
+        PolyTextureEvaluationResult evaluation = PolyTextureEvaluator.Evaluate(texture);
+        return EvaluateElementField(texture, evaluation, elementId, width, height, new HashSet<string>());
+    }
+
+    public static Image CreateScalarDebugPreview(Image scalar)
+    {
+        int width = scalar?.GetWidth() ?? 1;
+        int height = scalar?.GetHeight() ?? 1;
+        Image preview = Image.CreateEmpty(width, height, false, Image.Format.Rgb8);
+        Color background = new(0.055f, 0.065f, 0.085f);
+        preview.Fill(background);
+        if (scalar == null)
+        {
+            return preview;
+        }
+
+        float maximum = 0.0f;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                maximum = Mathf.Max(maximum, scalar.GetPixel(x, y).R);
+            }
+        }
+        if (maximum <= 0.000001f)
+        {
+            return preview;
+        }
+
+        Color low = new(0.34f, 0.08f, 0.52f);
+        Color middle = new(0.04f, 0.78f, 0.92f);
+        Color high = new(1.0f, 0.92f, 0.22f);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float normalized = Mathf.Clamp(scalar.GetPixel(x, y).R / maximum, 0.0f, 1.0f);
+                if (normalized <= 0.000001f)
+                {
+                    continue;
+                }
+                Color color = normalized < 0.5f
+                    ? low.Lerp(middle, normalized * 2.0f)
+                    : middle.Lerp(high, (normalized - 0.5f) * 2.0f);
+                preview.SetPixel(x, y, color);
+            }
+        }
+        return preview;
+    }
+
     public static Image DeriveNormalMap(Image heightImage, PolyTextureItem texture, float heightAmplitudeCm)
     {
         int width = heightImage?.GetWidth() ?? 1;

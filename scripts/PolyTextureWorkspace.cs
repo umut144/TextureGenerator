@@ -572,6 +572,11 @@ public partial class PolyTextureWorkspace : Control
         {
             BuildOutputActionBar(_document.ActiveOutput);
         }
+        else if (_document.SelectionKind == PolyTextureSelectionKind.Element
+            && _document.ActiveElement is InvertFilterElement or EdgeFalloffFilterElement)
+        {
+            _elementActionBar.AddChild(new Label { Text = "Scalar Debug Preview (auto-normalized)" });
+        }
         else if (_document.SelectionKind == PolyTextureSelectionKind.Point
             && _document.ActivePoint is CenterStrokePoint point)
         {
@@ -2640,8 +2645,8 @@ public partial class PolyTextureWorkspace : Control
 
     private void OnInspectorDocumentChanged()
     {
-        RebuildOutliner();
         OnDocumentChanged();
+        RefreshActiveScalarDebugPreview();
     }
 
     private void OnCanvasCursorChanged(PolyTextureCanvasCursor cursor)
@@ -2662,6 +2667,25 @@ public partial class PolyTextureWorkspace : Control
         _inspector.SetDocument(_document);
         _canvasView.SetHandleView(_handleView);
         RefreshElementActionBar();
+        RefreshActiveScalarDebugPreview();
+    }
+
+    private void RefreshActiveScalarDebugPreview()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        PolyTextureElement element = _document?.ActiveElement;
+        if (_document?.SelectionKind == PolyTextureSelectionKind.Element
+            && texture != null
+            && element is InvertFilterElement or EdgeFalloffFilterElement)
+        {
+            Image scalar = PolyTextureBakeService.BakeElementScalar(texture, element.Id, texture.PreviewWidthPx, texture.PreviewHeightPx);
+            _canvasView.SetOutputPreview(PolyTextureBakeService.CreateScalarDebugPreview(scalar));
+            return;
+        }
+        if (_document?.SelectionKind != PolyTextureSelectionKind.Output)
+        {
+            _canvasView.SetOutputPreview(null);
+        }
     }
 
     private void RebuildOutliner()
@@ -2990,10 +3014,7 @@ public partial class PolyTextureWorkspace : Control
         }
 
         _canvasView.SetDocument(_document);
-        if (_document.SelectionKind != PolyTextureSelectionKind.Output)
-        {
-            _canvasView.SetOutputPreview(null);
-        }
+        RefreshActiveScalarDebugPreview();
         _inspector.SetDocument(_document);
         _canvasView.QueueRedraw();
         if (_sweepCreationState != SweepCreationState.None
