@@ -520,7 +520,7 @@ public partial class PolyTextureInspector : PanelContainer
 
         _leftWidthSpinBox = CreateSpinBox(0, 1024, 0.01);
         _leftWidthRow = AddField(_pointInspector, "Left Width (cm)", _leftWidthSpinBox);
-        _leftWidthSpinBox.ValueChanged += value => ApplyCenterStrokePointChange(point =>
+        _leftWidthSpinBox.ValueChanged += value => ApplySelectedPointWidthChange(point =>
         {
             point.LeftWidth = (float)value;
             if (_document.ActiveCenterStroke?.Symmetry == true)
@@ -531,7 +531,7 @@ public partial class PolyTextureInspector : PanelContainer
 
         _rightWidthSpinBox = CreateSpinBox(0, 1024, 0.01);
         _rightWidthRow = AddField(_pointInspector, "Right Width (cm)", _rightWidthSpinBox);
-        _rightWidthSpinBox.ValueChanged += value => ApplyCenterStrokePointChange(point =>
+        _rightWidthSpinBox.ValueChanged += value => ApplySelectedPointWidthChange(point =>
         {
             point.RightWidth = (float)value;
             if (_document.ActiveCenterStroke?.Symmetry == true)
@@ -988,6 +988,24 @@ public partial class PolyTextureInspector : PanelContainer
         if (_document.SelectedPointIndex == 0)
         {
             _document.ActiveCenterStroke?.NormalizeAnchor();
+        }
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplySelectedPointWidthChange(Action<CenterStrokePoint> apply)
+    {
+        CenterStrokeElement element = _document?.ActiveCenterStroke;
+        if (_refreshing || element == null || _document.SelectedPointIndices.Count == 0)
+        {
+            return;
+        }
+        foreach (int pointIndex in _document.SelectedPointIndices)
+        {
+            if (pointIndex >= 0 && pointIndex < element.Points.Count)
+            {
+                apply(element.Points[pointIndex]);
+            }
         }
         DocumentChanged?.Invoke();
         Refresh();

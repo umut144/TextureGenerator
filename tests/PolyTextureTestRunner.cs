@@ -17,6 +17,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
         Run("crack lines remain semantic editable paths", TestCrackLineRoundTrip);
         Run("draw width applies to subsequent path points", TestDrawPointWidth);
+        Run("point multi-selection preserves a primary point", TestPointMultiSelection);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("repeat grid produces deterministic staggered regions", TestRepeatGrid);
         Run("branch generator produces deterministic crack structures", TestBranchGenerator);
@@ -251,6 +252,24 @@ public partial class PolyTextureTestRunner : SceneTree
         Equal(PolyTextureHandleMode.Aligned, first.HandleMode, "draw point path handle mode");
         CenterStrokePoint clamped = PolyTextureWorkspace.CreateDrawPoint(Vector2.Zero, -2.0f, supportsBezierHandles: false);
         Near(0.01f, clamped.LeftWidth, 0.0001f, "draw point minimum width");
+    }
+
+    private static void TestPointMultiSelection()
+    {
+        PolyTextureDocument document = CreateCrackDocument();
+        document.ActiveElementId = "main_crack";
+        document.SelectedPointIndex = 0;
+        document.TogglePointSelection(2);
+        Equal(2, document.SelectedPointIndices.Count, "multi-selection count");
+        Assert(document.IsPointSelected(0) && document.IsPointSelected(2), "multi-selection members");
+        Equal(2, document.SelectedPointIndex, "multi-selection primary point");
+
+        PolyTextureDocument clone = document.Clone();
+        Equal(2, clone.SelectedPointIndices.Count, "cloned multi-selection count");
+        Equal(2, clone.SelectedPointIndex, "cloned primary point");
+        clone.TogglePointSelection(2);
+        Equal(1, clone.SelectedPointIndices.Count, "toggle removes selected point");
+        Equal(0, clone.SelectedPointIndex, "remaining point becomes primary");
     }
 
     private static void TestRepeatGrid()

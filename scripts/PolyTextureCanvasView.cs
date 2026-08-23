@@ -70,7 +70,7 @@ public partial class PolyTextureCanvasView : Control
         set
         {
             int nextValue = Mathf.Clamp(value, -1, (ActiveCenterStroke?.Points.Count ?? 0) - 1);
-            if (_selectedPointIndex == nextValue)
+            if (_selectedPointIndex == nextValue && (_document?.SelectedPointIndices.Count ?? (nextValue >= 0 ? 1 : 0)) <= 1)
             {
                 return;
             }
@@ -315,7 +315,7 @@ public partial class PolyTextureCanvasView : Control
                     return;
                 }
 
-                BeginDrag(button.Position);
+                BeginDrag(button.Position, button.ShiftPressed);
             }
             else
             {
@@ -742,7 +742,7 @@ public partial class PolyTextureCanvasView : Control
         return false;
     }
 
-    private void BeginDrag(Vector2 screenPosition)
+    private void BeginDrag(Vector2 screenPosition, bool toggleSelection)
     {
         if (_document?.SelectionKind == PolyTextureSelectionKind.Guide && _document.ActiveGuide != null)
         {
@@ -768,8 +768,18 @@ public partial class PolyTextureCanvasView : Control
             return;
         }
 
-        _selectedPointIndex = pointIndex;
+        if (toggleSelection && hitTarget == DragTarget.Point)
+        {
+            _document.TogglePointSelection(pointIndex);
+            _selectedPointIndex = _document.SelectedPointIndex;
+            _dragTarget = DragTarget.None;
+            SelectedPointChanged?.Invoke(_selectedPointIndex);
+            QueueRedraw();
+            return;
+        }
+
         _document.SelectedPointIndex = pointIndex;
+        _selectedPointIndex = pointIndex;
         _document.SelectionKind = PolyTextureSelectionKind.Point;
         _dragTarget = hitTarget;
         EditStarted?.Invoke();
@@ -924,18 +934,26 @@ public partial class PolyTextureCanvasView : Control
 
         if (_dragTarget == DragTarget.LeftHandle)
         {
-            point.LeftWidth = width;
-            if (element.Symmetry)
+            foreach (int pointIndex in _document.SelectedPointIndices)
             {
-                point.RightWidth = width;
+                CenterStrokePoint selectedPoint = element.Points[pointIndex];
+                selectedPoint.LeftWidth = width;
+                if (element.Symmetry)
+                {
+                    selectedPoint.RightWidth = width;
+                }
             }
         }
         else if (_dragTarget == DragTarget.RightHandle)
         {
-            point.RightWidth = width;
-            if (element.Symmetry)
+            foreach (int pointIndex in _document.SelectedPointIndices)
             {
-                point.LeftWidth = width;
+                CenterStrokePoint selectedPoint = element.Points[pointIndex];
+                selectedPoint.RightWidth = width;
+                if (element.Symmetry)
+                {
+                    selectedPoint.LeftWidth = width;
+                }
             }
         }
     }
@@ -1049,11 +1067,12 @@ public partial class PolyTextureCanvasView : Control
             CenterStrokePoint point = element.Points[index];
             Vector2 pointDocumentPosition = element.Transform.TransformPoint(point.Position);
             Vector2 center = DocumentToScreen(pointDocumentPosition);
-            bool selected = index == _selectedPointIndex;
+            bool selected = _document.IsPointSelected(index);
+            bool primary = index == _selectedPointIndex;
 
             if (element.SupportsBezierHandles && _handleView == PolyTextureHandleView.Bezier)
             {
-                if (selected)
+                if (primary)
                 {
                     DrawBezierHandles(element, point);
                 }
@@ -1070,7 +1089,10 @@ public partial class PolyTextureCanvasView : Control
                 DrawCircle(rightHandle, HandleRadius, new Color(0.9f, 0.42f, 0.12f));
             }
 
-            DrawCircle(center, selected ? PointRadius + 2.0f : PointRadius, selected ? new Color(0.98f, 0.84f, 0.2f) : new Color(0.18f, 0.36f, 0.95f));
+            Color pointColor = primary
+                ? new Color(0.98f, 0.84f, 0.2f)
+                : selected ? new Color(0.98f, 0.56f, 0.18f) : new Color(0.18f, 0.36f, 0.95f);
+            DrawCircle(center, selected ? PointRadius + 2.0f : PointRadius, pointColor);
         }
     }
 

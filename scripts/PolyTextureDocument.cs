@@ -16,7 +16,21 @@ public sealed class PolyTextureDocument
     public string ActiveElementId { get; set; } = string.Empty;
     public string ActiveGuideId { get; set; } = string.Empty;
     public string ActiveOutputId { get; set; } = string.Empty;
-    public int SelectedPointIndex { get; set; } = -1;
+    private int _selectedPointIndex = -1;
+    public List<int> SelectedPointIndices { get; } = new();
+    public int SelectedPointIndex
+    {
+        get => _selectedPointIndex;
+        set
+        {
+            _selectedPointIndex = value;
+            SelectedPointIndices.Clear();
+            if (value >= 0)
+            {
+                SelectedPointIndices.Add(value);
+            }
+        }
+    }
     public PolyTextureSelectionKind SelectionKind { get; set; } = PolyTextureSelectionKind.Texture;
     public List<PolyTextureItem> Textures { get; } = new();
 
@@ -51,6 +65,46 @@ public sealed class PolyTextureDocument
                 ? null
                 : centerStroke.Points[SelectedPointIndex];
         }
+    }
+
+    public bool IsPointSelected(int pointIndex)
+    {
+        return SelectedPointIndices.Contains(pointIndex);
+    }
+
+    public void SetPointSelection(IEnumerable<int> pointIndices, int primaryPointIndex)
+    {
+        SelectedPointIndices.Clear();
+        foreach (int pointIndex in pointIndices)
+        {
+            if (pointIndex >= 0 && !SelectedPointIndices.Contains(pointIndex))
+            {
+                SelectedPointIndices.Add(pointIndex);
+            }
+        }
+        _selectedPointIndex = SelectedPointIndices.Contains(primaryPointIndex)
+            ? primaryPointIndex
+            : SelectedPointIndices.Count > 0 ? SelectedPointIndices[^1] : -1;
+        SelectionKind = _selectedPointIndex >= 0 ? PolyTextureSelectionKind.Point : PolyTextureSelectionKind.Element;
+    }
+
+    public void TogglePointSelection(int pointIndex)
+    {
+        if (pointIndex < 0)
+        {
+            return;
+        }
+        if (SelectedPointIndices.Contains(pointIndex))
+        {
+            SelectedPointIndices.Remove(pointIndex);
+            _selectedPointIndex = SelectedPointIndices.Count > 0 ? SelectedPointIndices[^1] : -1;
+        }
+        else
+        {
+            SelectedPointIndices.Add(pointIndex);
+            _selectedPointIndex = pointIndex;
+        }
+        SelectionKind = _selectedPointIndex >= 0 ? PolyTextureSelectionKind.Point : PolyTextureSelectionKind.Element;
     }
 
     public void EnsureSelection()
@@ -94,6 +148,14 @@ public sealed class PolyTextureDocument
                     : PolyTextureSelectionKind.Element;
             }
         }
+        else
+        {
+            SelectedPointIndices.RemoveAll(index => index < 0 || index >= centerStroke.Points.Count);
+            if (!SelectedPointIndices.Contains(SelectedPointIndex))
+            {
+                SelectedPointIndices.Add(SelectedPointIndex);
+            }
+        }
 
         if (string.IsNullOrEmpty(ActiveElementId) && SelectionKind != PolyTextureSelectionKind.Texture)
         {
@@ -130,6 +192,8 @@ public sealed class PolyTextureDocument
         {
             clone.Textures.Add(texture.Clone());
         }
+
+        clone.SetPointSelection(SelectedPointIndices, SelectedPointIndex);
 
         clone.EnsureSelection();
         return clone;

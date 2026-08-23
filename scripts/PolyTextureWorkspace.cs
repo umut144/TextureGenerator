@@ -575,6 +575,10 @@ public partial class PolyTextureWorkspace : Control
         else if (_document.SelectionKind == PolyTextureSelectionKind.Point
             && _document.ActivePoint is CenterStrokePoint point)
         {
+            if (_document.SelectedPointIndices.Count > 1)
+            {
+                _elementActionBar.AddChild(new Label { Text = $"{_document.SelectedPointIndices.Count} Points Selected" });
+            }
             OptionButton handleViewOptionButton = new() { CustomMinimumSize = new Vector2(100, 0) };
             bool supportsBezierHandles = _document.ActiveCenterStroke?.SupportsBezierHandles == true;
             if (!supportsBezierHandles && _handleView == PolyTextureHandleView.Bezier)
@@ -616,7 +620,7 @@ public partial class PolyTextureWorkspace : Control
             }
             else if (_handleView == PolyTextureHandleView.Width)
             {
-                AddPointWidthActionField("Left Width", point.LeftWidth, value => ApplyActionPointChange(current =>
+                AddPointWidthActionField("Left Width", point.LeftWidth, value => ApplyActionSelectedPointWidthChange(current =>
                 {
                     current.LeftWidth = value;
                     if (_document.ActiveCenterStroke?.Symmetry == true)
@@ -624,7 +628,7 @@ public partial class PolyTextureWorkspace : Control
                         current.RightWidth = value;
                     }
                 }));
-                AddPointWidthActionField("Right Width", point.RightWidth, value => ApplyActionPointChange(current =>
+                AddPointWidthActionField("Right Width", point.RightWidth, value => ApplyActionSelectedPointWidthChange(current =>
                 {
                     current.RightWidth = value;
                     if (_document.ActiveCenterStroke?.Symmetry == true)
@@ -937,6 +941,25 @@ public partial class PolyTextureWorkspace : Control
         _canvasView.QueueRedraw();
         _inspector.Refresh();
         MarkChanged("Point handles changed.");
+    }
+
+    private void ApplyActionSelectedPointWidthChange(Action<CenterStrokePoint> apply)
+    {
+        CenterStrokeElement element = _document?.ActiveCenterStroke;
+        if (_refreshingElementActionBar || element == null || _document.SelectedPointIndices.Count == 0)
+        {
+            return;
+        }
+        foreach (int pointIndex in _document.SelectedPointIndices)
+        {
+            if (pointIndex >= 0 && pointIndex < element.Points.Count)
+            {
+                apply(element.Points[pointIndex]);
+            }
+        }
+        _canvasView.QueueRedraw();
+        _inspector.Refresh();
+        MarkChanged("Selected point widths changed.");
     }
 
     private void ApplyActionPointPositionChange(Action<CenterStrokePoint> apply)
@@ -2595,7 +2618,10 @@ public partial class PolyTextureWorkspace : Control
 
     private void OnSelectedPointChanged(int selectedPointIndex)
     {
-        _document.SelectedPointIndex = selectedPointIndex;
+        if (_document.SelectedPointIndex != selectedPointIndex)
+        {
+            _document.SelectedPointIndex = selectedPointIndex;
+        }
         _document.SelectionKind = selectedPointIndex >= 0 ? PolyTextureSelectionKind.Point : PolyTextureSelectionKind.Element;
         _inspector.SetDocument(_document);
         RebuildOutliner();

@@ -26,6 +26,12 @@ PolyTextureDerivedData
 content. They may be stored beside a document for convenience but must not
 participate in source fingerprints.
 
+Point selection may contain multiple indices for batch property editing while
+retaining one primary point for position and Bezier-handle inspection. Normal
+click selects one point; Shift-click toggles membership. Batch width edits
+apply to every selected point, while position and handle edits remain scoped to
+the primary point.
+
 ## Identity
 
 Every addressable canonical record has:
