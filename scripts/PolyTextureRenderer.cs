@@ -33,6 +33,25 @@ public static class PolyTextureRenderer
         return polygon;
     }
 
+    public static List<Vector2> BuildEllipseRegion(EllipseRegionElement region)
+    {
+        List<Vector2> polygon = new();
+        if (region == null || !region.Enabled || region.WidthCm <= 0.0f || region.HeightCm <= 0.0f)
+        {
+            return polygon;
+        }
+        const int sampleCount = 48;
+        Vector2 radii = new(region.WidthCm * 0.5f, region.HeightCm * 0.5f);
+        float rotation = Mathf.DegToRad(region.RotationDegrees);
+        for (int sample = 0; sample < sampleCount; sample++)
+        {
+            float angle = Mathf.Tau * sample / sampleCount;
+            Vector2 local = new Vector2(Mathf.Cos(angle) * radii.X, Mathf.Sin(angle) * radii.Y);
+            polygon.Add(region.Position + local.Rotated(rotation));
+        }
+        return polygon;
+    }
+
     public static List<Vector2> BuildFilledPolygon(CenterStrokeElement element)
     {
         List<Vector2> polygon = new();

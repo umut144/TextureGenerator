@@ -12,6 +12,7 @@ public partial class PolyTextureInspector : PanelContainer
     private VBoxContainer _pointInspector;
     private VBoxContainer _outputInspector;
     private VBoxContainer _regionInspector;
+    private VBoxContainer _ellipseInspector;
     private VBoxContainer _repeatInspector;
     private VBoxContainer _branchInspector;
     private VBoxContainer _filterInspector;
@@ -82,6 +83,11 @@ public partial class PolyTextureInspector : PanelContainer
     private SpinBox _regionWidthSpinBox;
     private SpinBox _regionHeightSpinBox;
     private SpinBox _regionCornerRadiusSpinBox;
+    private SpinBox _ellipsePositionXSpinBox;
+    private SpinBox _ellipsePositionYSpinBox;
+    private SpinBox _ellipseRotationSpinBox;
+    private SpinBox _ellipseWidthSpinBox;
+    private SpinBox _ellipseHeightSpinBox;
     private Label _repeatSourceLabel;
     private SpinBox _repeatColumnsSpinBox;
     private SpinBox _repeatRowsSpinBox;
@@ -141,6 +147,7 @@ public partial class PolyTextureInspector : PanelContainer
         bool supportsBezierHandles = element?.SupportsBezierHandles == true;
         PolyTextureOutputBinding output = _document.ActiveOutput;
         RectangleRegionElement region = selectedElement as RectangleRegionElement;
+        EllipseRegionElement ellipse = selectedElement as EllipseRegionElement;
         RepeatGridGeneratorElement repeat = selectedElement as RepeatGridGeneratorElement;
         BranchGeneratorElement branch = selectedElement as BranchGeneratorElement;
         InvertFilterElement invert = selectedElement as InvertFilterElement;
@@ -152,6 +159,7 @@ public partial class PolyTextureInspector : PanelContainer
         _pointInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Point;
         _outputInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Output;
         _regionInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && region != null;
+        _ellipseInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && ellipse != null;
         _repeatInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && repeat != null;
         _branchInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && branch != null;
         _filterInspector.Visible = _document.SelectionKind == PolyTextureSelectionKind.Element && invert != null;
@@ -320,6 +328,15 @@ public partial class PolyTextureInspector : PanelContainer
             _regionHeightSpinBox.Value = region.HeightCm;
             _regionCornerRadiusSpinBox.MaxValue = Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f;
             _regionCornerRadiusSpinBox.Value = region.CornerRadiusCm;
+        }
+        if (ellipse != null)
+        {
+            Vector2 displayPosition = ToDisplayPosition(ellipse.Position);
+            _ellipsePositionXSpinBox.Value = displayPosition.X;
+            _ellipsePositionYSpinBox.Value = displayPosition.Y;
+            _ellipseRotationSpinBox.Value = ellipse.RotationDegrees;
+            _ellipseWidthSpinBox.Value = ellipse.WidthCm;
+            _ellipseHeightSpinBox.Value = ellipse.HeightCm;
         }
         if (repeat != null)
         {
@@ -620,6 +637,23 @@ public partial class PolyTextureInspector : PanelContainer
         AddField(_regionInspector, "Corner Radius (cm)", _regionCornerRadiusSpinBox);
         _regionCornerRadiusSpinBox.ValueChanged += value => ApplyRegionChange(region => region.CornerRadiusCm = Mathf.Min((float)value, Mathf.Min(region.WidthCm, region.HeightCm) * 0.5f));
 
+        _ellipseInspector = CreateSection(stack, "Ellipse Region");
+        _ellipsePositionXSpinBox = CreateSpinBox(-100000, 100000, 0.1);
+        AddField(_ellipseInspector, "Position X (cm)", _ellipsePositionXSpinBox);
+        _ellipsePositionXSpinBox.ValueChanged += value => ApplyEllipseDisplayPosition(new Vector2((float)value, (float)_ellipsePositionYSpinBox.Value));
+        _ellipsePositionYSpinBox = CreateSpinBox(-100000, 100000, 0.1);
+        AddField(_ellipseInspector, "Position Y (cm)", _ellipsePositionYSpinBox);
+        _ellipsePositionYSpinBox.ValueChanged += value => ApplyEllipseDisplayPosition(new Vector2((float)_ellipsePositionXSpinBox.Value, (float)value));
+        _ellipseRotationSpinBox = CreateSpinBox(-3600, 3600, 0.1);
+        AddField(_ellipseInspector, "Rotation (deg CCW)", _ellipseRotationSpinBox);
+        _ellipseRotationSpinBox.ValueChanged += value => ApplyEllipseChange(ellipse => ellipse.RotationDegrees = (float)value);
+        _ellipseWidthSpinBox = CreateSpinBox(0.01, 100000, 0.1);
+        AddField(_ellipseInspector, "Width (cm)", _ellipseWidthSpinBox);
+        _ellipseWidthSpinBox.ValueChanged += value => ApplyEllipseChange(ellipse => ellipse.WidthCm = (float)value);
+        _ellipseHeightSpinBox = CreateSpinBox(0.01, 100000, 0.1);
+        AddField(_ellipseInspector, "Height (cm)", _ellipseHeightSpinBox);
+        _ellipseHeightSpinBox.ValueChanged += value => ApplyEllipseChange(ellipse => ellipse.HeightCm = (float)value);
+
         _repeatInspector = CreateSection(stack, "Repeat Grid");
         _repeatSourceLabel = new Label();
         AddField(_repeatInspector, "Source", _repeatSourceLabel);
@@ -833,6 +867,22 @@ public partial class PolyTextureInspector : PanelContainer
     private void ApplyRegionDisplayPosition(Vector2 displayPosition)
     {
         ApplyRegionChange(region => region.Position = ToStoredPosition(displayPosition));
+    }
+
+    private void ApplyEllipseChange(Action<EllipseRegionElement> apply)
+    {
+        if (_refreshing || _document?.ActiveElement is not EllipseRegionElement ellipse)
+        {
+            return;
+        }
+        apply(ellipse);
+        DocumentChanged?.Invoke();
+        Refresh();
+    }
+
+    private void ApplyEllipseDisplayPosition(Vector2 displayPosition)
+    {
+        ApplyEllipseChange(ellipse => ellipse.Position = ToStoredPosition(displayPosition));
     }
 
     private void ApplyRepeatChange(Action<RepeatGridGeneratorElement> apply)

@@ -25,6 +25,13 @@ public static class PolyTextureEvaluator
                     ? new List<List<Vector2>> { polygon }
                     : new List<List<Vector2>>();
             }
+            else if (operation is EllipseRegionElement ellipseRegion)
+            {
+                List<Vector2> polygon = PolyTextureRenderer.BuildEllipseRegion(ellipseRegion);
+                result.GeometryByElementId[operation.Id] = polygon.Count >= 3
+                    ? new List<List<Vector2>> { polygon }
+                    : new List<List<Vector2>>();
+            }
             else if (operation is CenterStrokeElement centerStroke)
             {
                 List<Vector2> polygon = PolyTextureRenderer.BuildFilledPolygon(centerStroke);

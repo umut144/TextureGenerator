@@ -16,6 +16,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("rectangle regions remain parametric across round trips", TestRectangleRegionRoundTrip);
+        Run("ellipse regions remain parametric across round trips", TestEllipseRegionRoundTrip);
         Run("crack lines remain semantic editable paths", TestCrackLineRoundTrip);
         Run("draw width applies to subsequent path points", TestDrawPointWidth);
         Run("point multi-selection preserves a primary point", TestPointMultiSelection);
@@ -205,6 +206,40 @@ public partial class PolyTextureTestRunner : SceneTree
         List<CenterStrokeElement> instances = PolyTextureRenderer.BuildSweepInstances(document.Textures[0], evaluation.LiveSweeps[0]);
         Equal(9, instances.Count, "live parameter update");
         Assert(document.Textures[0].Elements.Count == 3, "evaluation must not append editable copies");
+    }
+
+    private static void TestEllipseRegionRoundTrip()
+    {
+        PolyTextureDocument document = new()
+        {
+            ActiveTextureId = "mold",
+            ActiveElementId = "colony",
+            SelectionKind = PolyTextureSelectionKind.Element
+        };
+        PolyTextureItem texture = new() { Id = "mold", Name = "Mold" };
+        EllipseRegionElement ellipse = new()
+        {
+            Id = "colony",
+            Name = "Colony",
+            Position = new Vector2(80.0f, 120.0f),
+            WidthCm = 24.0f,
+            HeightCm = 16.0f,
+            RotationDegrees = 18.0f
+        };
+        texture.Elements.Add(ellipse);
+        document.Textures.Add(texture);
+        Assert(PolyTextureValidator.Validate(document, out string validationError), validationError);
+        Equal(48, PolyTextureRenderer.BuildEllipseRegion(ellipse).Count, "ellipse sample count");
+
+        string path = "user://polytexture_test_ellipse.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        EllipseRegionElement loadedEllipse = loaded.Textures[0].GetElement("colony") as EllipseRegionElement;
+        Assert(loadedEllipse != null, "ellipse missing after round trip");
+        Near(ellipse.Position, loadedEllipse.Position, 0.0001f, "ellipse position");
+        Near(ellipse.WidthCm, loadedEllipse.WidthCm, 0.0001f, "ellipse width");
+        Near(ellipse.HeightCm, loadedEllipse.HeightCm, 0.0001f, "ellipse height");
+        Near(ellipse.RotationDegrees, loadedEllipse.RotationDegrees, 0.0001f, "ellipse rotation");
     }
 
     private static void TestCrackLineRoundTrip()

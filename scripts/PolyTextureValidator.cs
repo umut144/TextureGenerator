@@ -300,6 +300,11 @@ public static class PolyTextureValidator
             return false;
         }
 
+        if (element is EllipseRegionElement ellipseRegion && !ValidateEllipseRegion(ellipseRegion, path, out error))
+        {
+            return false;
+        }
+
         if (element is SweepGeneratorElement sweep && !ValidateSweep(sweep, path, out error))
         {
             return false;
@@ -374,6 +379,20 @@ public static class PolyTextureValidator
             || region.CornerRadiusCm < 0.0f || region.CornerRadiusCm > maximumRadius)
         {
             error = $"{path} contains invalid rectangle region values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateEllipseRegion(EllipseRegionElement region, string path, out string error)
+    {
+        error = string.Empty;
+        if (!float.IsFinite(region.Position.X) || !float.IsFinite(region.Position.Y)
+            || !float.IsFinite(region.RotationDegrees)
+            || !float.IsFinite(region.WidthCm) || !float.IsFinite(region.HeightCm)
+            || region.WidthCm <= 0.0f || region.HeightCm <= 0.0f)
+        {
+            error = $"{path} contains invalid ellipse region values";
             return false;
         }
         return true;
@@ -653,6 +672,13 @@ public static class PolyTextureValidator
                     return false;
                 }
             }
+            else if (type.Equals(EllipseRegionElement.ElementType, System.StringComparison.Ordinal))
+            {
+                if (!ValidateEllipseRegionDictionary(element, elementPath, out error))
+                {
+                    return false;
+                }
+            }
             else if (type.Equals(SweepGeneratorElement.ElementType, System.StringComparison.Ordinal))
             {
                 if (!ValidateSweepDictionary(element, elementPath, out error))
@@ -847,6 +873,27 @@ public static class PolyTextureValidator
             || width <= 0.0f || height <= 0.0f || radius < 0.0f || radius > Mathf.Min(width, height) * 0.5f)
         {
             error = $"{path} contains invalid rectangle region values";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool ValidateEllipseRegionDictionary(Godot.Collections.Dictionary region, string path, out string error)
+    {
+        if (!RequireBool(region, "enabled", out _, out error, path)
+            || !RequireNumber(region, "opacity", out float opacity, out error, path)
+            || !ValidateHandleVector(region, "position", path, out error)
+            || !RequireNumber(region, "rotation_degrees", out float rotation, out error, path)
+            || !RequireNumber(region, "width_cm", out float width, out error, path)
+            || !RequireNumber(region, "height_cm", out float height, out error, path))
+        {
+            return false;
+        }
+        if (!float.IsFinite(opacity) || opacity < 0.0f || opacity > 1.0f
+            || !float.IsFinite(rotation) || !float.IsFinite(width) || !float.IsFinite(height)
+            || width <= 0.0f || height <= 0.0f)
+        {
+            error = $"{path} contains invalid ellipse region values";
             return false;
         }
         return true;

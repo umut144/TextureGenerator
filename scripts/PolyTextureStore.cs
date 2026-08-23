@@ -141,6 +141,10 @@ public static class PolyTextureStore
         {
             AppendRectangleRegion(builder, rectangleRegion, indent, suffix);
         }
+        else if (element is EllipseRegionElement ellipseRegion)
+        {
+            AppendEllipseRegion(builder, ellipseRegion, indent, suffix);
+        }
         else if (element is MirrorGeneratorElement mirror)
         {
             AppendMirror(builder, mirror, indent, suffix);
@@ -262,6 +266,21 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"width_cm\": {Number(region.WidthCm)},");
         builder.AppendLine($"{indent}  \"height_cm\": {Number(region.HeightCm)},");
         builder.AppendLine($"{indent}  \"corner_radius_cm\": {Number(region.CornerRadiusCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendEllipseRegion(StringBuilder builder, EllipseRegionElement region, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(region.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(region.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{EllipseRegionElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(region.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(region.Opacity)},");
+        builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(region.Position.X)}, \"y\": {Number(region.Position.Y)} }},");
+        builder.AppendLine($"{indent}  \"rotation_degrees\": {Number(region.RotationDegrees)},");
+        builder.AppendLine($"{indent}  \"width_cm\": {Number(region.WidthCm)},");
+        builder.AppendLine($"{indent}  \"height_cm\": {Number(region.HeightCm)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
 
@@ -458,6 +477,11 @@ public static class PolyTextureStore
             return ReadRectangleRegion(element);
         }
 
+        if (type.Equals(EllipseRegionElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadEllipseRegion(element);
+        }
+
         if (type.Equals(CenterPathElement.ElementType, System.StringComparison.Ordinal))
         {
             return ReadCenterStroke(element, CenterPathElement.ElementType);
@@ -587,6 +611,21 @@ public static class PolyTextureStore
             WidthCm = ReadFloat(region, "width_cm", 80.0f),
             HeightCm = ReadFloat(region, "height_cm", 40.0f),
             CornerRadiusCm = ReadFloat(region, "corner_radius_cm", 0.0f)
+        };
+    }
+
+    private static EllipseRegionElement ReadEllipseRegion(Godot.Collections.Dictionary region)
+    {
+        return new EllipseRegionElement
+        {
+            Id = ReadString(region, "id", "ellipse_region"),
+            Name = ReadString(region, "name", "Ellipse Region"),
+            Enabled = ReadBool(region, "enabled", true),
+            Opacity = ReadFloat(region, "opacity", 0.86f),
+            Position = ReadVector2(region, "position"),
+            RotationDegrees = ReadFloat(region, "rotation_degrees", 0.0f),
+            WidthCm = ReadFloat(region, "width_cm", 24.0f),
+            HeightCm = ReadFloat(region, "height_cm", 24.0f)
         };
     }
 

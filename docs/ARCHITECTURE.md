@@ -75,6 +75,11 @@ Initial port types are `PointSet`, `PathSet`, `RegionSet`, `InstanceSet`,
 data is position, physical size, rotation, and corner radius; polygon samples
 are always derived by the evaluator.
 
+`Ellipse Region` is a parametric `RegionSet` Source for circular and elliptical
+marks. Position, physical size, and rotation are canonical; its polygon is a
+deterministic evaluator-derived approximation. It can serve as a scatter
+prototype for colonies, spots, pores, and similar repeated forms.
+
 `Crack Line` is a semantic `PathSet` Source. It stores an editable physical
 center path with per-point widths and Bezier handles. Its dedicated type keeps
 crack-specific generators and future reveal metadata distinct from generic

@@ -397,6 +397,14 @@ public partial class PolyTextureCanvasView : Control
                     DrawRegionPreview(evaluation.GetGeometry(rectangleRegion.Id), rectangleRegion.Opacity, elementActive);
                 }
             }
+            else if (element is EllipseRegionElement ellipseRegion)
+            {
+                bool elementActive = active && ellipseRegion == _document.ActiveElement;
+                if (!evaluation.HiddenSourceIds.Contains(ellipseRegion.Id) || elementActive)
+                {
+                    DrawRegionPreview(evaluation.GetGeometry(ellipseRegion.Id), ellipseRegion.Opacity, elementActive);
+                }
+            }
             else if (element is CenterStrokeElement centerStroke)
             {
                 bool elementActive = active && centerStroke == _document.ActiveElement;
@@ -671,6 +679,22 @@ public partial class PolyTextureCanvasView : Control
                 if (screenRegion.Length >= 3 && Geometry2D.IsPointInPolygon(screenPosition, screenRegion))
                 {
                     elementId = rectangleRegion.Id;
+                    return true;
+                }
+                continue;
+            }
+
+            if (candidate is EllipseRegionElement ellipseRegion)
+            {
+                List<Vector2> regionPolygon = PolyTextureRenderer.BuildEllipseRegion(ellipseRegion);
+                Vector2[] screenRegion = new Vector2[regionPolygon.Count];
+                for (int pointIndex = 0; pointIndex < regionPolygon.Count; pointIndex++)
+                {
+                    screenRegion[pointIndex] = DocumentToScreen(regionPolygon[pointIndex]);
+                }
+                if (screenRegion.Length >= 3 && Geometry2D.IsPointInPolygon(screenPosition, screenRegion))
+                {
+                    elementId = ellipseRegion.Id;
                     return true;
                 }
                 continue;

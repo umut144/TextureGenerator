@@ -44,6 +44,7 @@ public partial class PolyTextureWorkspace : Control
     private const int GuidePointMenuId = 1;
     private const int GuideAxisMenuId = 2;
     private const int RectangleRegionMenuId = 3;
+    private const int EllipseRegionMenuId = 4;
 
     private PolyTextureDocument _document;
     private string _documentPath = string.Empty;
@@ -363,6 +364,7 @@ public partial class PolyTextureWorkspace : Control
         guidePopup.AddItem("Guide Point", GuidePointMenuId);
         guidePopup.AddItem("Guide Axis", GuideAxisMenuId);
         guidePopup.AddItem("Rectangle Region", RectangleRegionMenuId);
+        guidePopup.AddItem("Ellipse Region", EllipseRegionMenuId);
         guidePopup.IdPressed += OnGuideMenuPressed;
         toolbar.AddChild(_guideMenuButton);
 
@@ -1612,6 +1614,36 @@ public partial class PolyTextureWorkspace : Control
         {
             AddRectangleRegion();
         }
+        else if ((int)id == EllipseRegionMenuId)
+        {
+            AddEllipseRegion();
+        }
+    }
+
+    private void AddEllipseRegion()
+    {
+        PolyTextureItem texture = _document?.ActiveTexture;
+        if (texture == null)
+        {
+            return;
+        }
+        float size = Mathf.Max(0.01f, Mathf.Min(texture.DomainWidthCm, texture.DomainHeightCm) * 0.06f);
+        EllipseRegionElement region = new()
+        {
+            Id = EnsureUniqueElementId(texture, "ellipse_region"),
+            Name = "Ellipse Region",
+            Position = new Vector2(texture.DomainWidthCm * 0.5f, texture.DomainHeightCm * 0.5f),
+            WidthCm = size,
+            HeightCm = size
+        };
+        texture.Elements.Add(region);
+        _document.ActiveElementId = region.Id;
+        _document.ActiveGuideId = string.Empty;
+        _document.ActiveOutputId = string.Empty;
+        _document.SelectedPointIndex = -1;
+        _document.SelectionKind = PolyTextureSelectionKind.Element;
+        RefreshAll();
+        MarkChanged("Ellipse Region source added.");
     }
 
     private void AddRectangleRegion()
@@ -2737,7 +2769,7 @@ public partial class PolyTextureWorkspace : Control
                 foreach (PolyTextureElement element in texture.Elements)
                 {
                     TreeItem parent = generatorsGroup;
-                    if (element is CenterStrokeElement or RectangleRegionElement)
+                    if (element is CenterStrokeElement or RectangleRegionElement or EllipseRegionElement)
                     {
                         parent = elementsGroup;
                     }
