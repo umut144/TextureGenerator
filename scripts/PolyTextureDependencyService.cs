@@ -27,6 +27,14 @@ public static class PolyTextureDependencyService
             }
         }
 
+        foreach (PolyTextureOutputBinding output in texture.Outputs)
+        {
+            if (output.SourceElementId.Equals(elementId, StringComparison.Ordinal))
+            {
+                dependents.Add(output.Id);
+            }
+        }
+
         return dependents;
     }
 

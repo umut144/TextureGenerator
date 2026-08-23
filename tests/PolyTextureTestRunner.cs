@@ -11,6 +11,7 @@ public partial class PolyTextureTestRunner : SceneTree
     {
         Run("schema 1 is the only accepted document contract", TestSchemaContract);
         Run("document round trip preserves names and references", TestRoundTrip);
+        Run("semantic outputs round trip with stable bindings", TestOutputRoundTrip);
         Run("preview resolution is independent from vector sources", TestResolutionIndependence);
         Run("sweep evaluation is deterministic", TestSweepDeterminism);
         Run("evaluator keeps operations live", TestLiveEvaluation);
@@ -18,6 +19,7 @@ public partial class PolyTextureTestRunner : SceneTree
         Run("display rename preserves stable references", TestRenamePreservesReferences);
         Run("dependency-aware deletion blocks used inputs", TestDependencyDeletion);
         Run("validator rejects missing generator inputs", TestMissingReferenceValidation);
+        Run("validator rejects missing output inputs", TestMissingOutputReferenceValidation);
 
         if (_failures.Count == 0)
         {
@@ -92,6 +94,20 @@ public partial class PolyTextureTestRunner : SceneTree
 
         Assert(PolyTextureSurfaceService.SetDomainSize(texture, 250.0f, 180.0f), "domain size should change");
         Near(before.Points[1].Position, source.Points[1].Position, 0.0001f, "domain resize point invariance");
+    }
+
+    private static void TestOutputRoundTrip()
+    {
+        PolyTextureDocument document = CreateGeneratorDocument();
+        string path = "user://polytexture_test_outputs.polytexture.json";
+        Assert(PolyTextureStore.Save(path, document, out string saveError), saveError);
+        Assert(PolyTextureStore.Load(path, out PolyTextureDocument loaded, out string loadError), loadError);
+        Equal(2, loaded.Textures[0].Outputs.Count, "output count");
+        PolyTextureOutputBinding height = loaded.Textures[0].GetOutput("height");
+        Equal(PolyTextureOutputKind.Height, height.Kind, "height kind");
+        Equal("sweep", height.SourceElementId, "height source");
+        Near(0.8f, height.HeightAmplitudeCm, 0.0001f, "height amplitude");
+        Equal("Leaf Veins", loaded.Textures[0].GetOutput("veins").Name, "mask name");
     }
 
     private static void TestSweepDeterminism()
@@ -171,7 +187,8 @@ public partial class PolyTextureTestRunner : SceneTree
         PolyTextureDocument document = CreateGeneratorDocument();
         Assert(!PolyTextureDependencyService.CanDeleteElement(document.Textures[0], "source", out string error), "used source deletion should be blocked");
         Assert(error.Contains("sweep", StringComparison.Ordinal), "diagnostic should name dependent sweep");
-        Assert(PolyTextureDependencyService.CanDeleteElement(document.Textures[0], "sweep", out _), "unreferenced generator should be deletable");
+        Assert(!PolyTextureDependencyService.CanDeleteElement(document.Textures[0], "sweep", out string outputError), "output-bound generator deletion should be blocked");
+        Assert(outputError.Contains("height", StringComparison.Ordinal), "diagnostic should name dependent output");
     }
 
     private static void TestMissingReferenceValidation()
@@ -181,6 +198,14 @@ public partial class PolyTextureTestRunner : SceneTree
         sweep.SourceElementId = "missing";
         Assert(!PolyTextureValidator.Validate(document, out string error), "missing source should fail validation");
         Assert(error.Contains("existing", StringComparison.Ordinal), "missing reference diagnostic should be concrete");
+    }
+
+    private static void TestMissingOutputReferenceValidation()
+    {
+        PolyTextureDocument document = CreateGeneratorDocument();
+        document.Textures[0].GetOutput("height").SourceElementId = "missing";
+        Assert(!PolyTextureValidator.Validate(document, out string error), "missing output source should fail validation");
+        Assert(error.Contains("existing element", StringComparison.Ordinal), "missing output diagnostic should be concrete");
     }
 
     private static PolyTextureDocument CreateGeneratorDocument()
@@ -243,6 +268,21 @@ public partial class PolyTextureTestRunner : SceneTree
         texture.Elements.Add(source);
         texture.Elements.Add(target);
         texture.Elements.Add(sweep);
+        texture.Outputs.Add(new PolyTextureOutputBinding
+        {
+            Id = "height",
+            Name = "Height",
+            Kind = PolyTextureOutputKind.Height,
+            SourceElementId = sweep.Id,
+            HeightAmplitudeCm = 0.8f
+        });
+        texture.Outputs.Add(new PolyTextureOutputBinding
+        {
+            Id = "veins",
+            Name = "Leaf Veins",
+            Kind = PolyTextureOutputKind.Mask,
+            SourceElementId = sweep.Id
+        });
         document.Textures.Add(texture);
         return document;
     }

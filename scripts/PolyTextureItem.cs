@@ -14,6 +14,7 @@ public sealed class PolyTextureItem
     public bool Visible { get; set; } = true;
     public List<PolyTextureElement> Elements { get; } = new();
     public List<PolyTextureGuide> Guides { get; } = new();
+    public List<PolyTextureOutputBinding> Outputs { get; } = new();
 
     public PolyTextureElement GetElement(string id)
     {
@@ -28,6 +29,11 @@ public sealed class PolyTextureItem
     public PolyTextureGuide GetGuide(string id)
     {
         return Guides.FirstOrDefault(guide => guide.Id.Equals(id, StringComparison.Ordinal));
+    }
+
+    public PolyTextureOutputBinding GetOutput(string id)
+    {
+        return Outputs.FirstOrDefault(output => output.Id.Equals(id, StringComparison.Ordinal));
     }
 
     public PolyTextureItem Clone()
@@ -52,6 +58,10 @@ public sealed class PolyTextureItem
         foreach (PolyTextureGuide guide in Guides)
         {
             clone.Guides.Add(guide.Clone());
+        }
+        foreach (PolyTextureOutputBinding output in Outputs)
+        {
+            clone.Outputs.Add(output.Clone());
         }
 
         return clone;

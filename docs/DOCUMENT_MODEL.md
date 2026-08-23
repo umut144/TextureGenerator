@@ -60,6 +60,11 @@ The first supported semantic outputs are:
 RGBA packing is an optional export optimization and is not part of the
 canonical output model.
 
+Each output binding references one source or operation by stable ID. Height
+bindings additionally declare their physical amplitude in centimeters. Mask
+bindings use their mutable display name as the artist-facing semantic label;
+their stable ID remains the technical identity.
+
 ## Animation metadata
 
 Generated vector segments and instances may carry normalized `reveal_start`,

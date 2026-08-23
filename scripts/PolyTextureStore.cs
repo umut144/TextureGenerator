@@ -118,6 +118,13 @@ public static class PolyTextureStore
                 string guideSuffix = guideIndex == texture.Guides.Count - 1 ? string.Empty : ",";
                 AppendGuide(builder, texture.Guides[guideIndex], "        ", guideSuffix);
             }
+            builder.AppendLine("      ],");
+            builder.AppendLine("      \"outputs\": [");
+            for (int outputIndex = 0; outputIndex < texture.Outputs.Count; outputIndex++)
+            {
+                string outputSuffix = outputIndex == texture.Outputs.Count - 1 ? string.Empty : ",";
+                AppendOutput(builder, texture.Outputs[outputIndex], "        ", outputSuffix);
+            }
             builder.AppendLine("      ]");
             builder.AppendLine($"    }}{textureSuffix}");
         }
@@ -155,6 +162,19 @@ public static class PolyTextureStore
         builder.AppendLine($"{indent}  \"type\": \"{GuideTypeToJson(guide.Type)}\",");
         builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(guide.Position.X)}, \"y\": {Number(guide.Position.Y)} }},");
         builder.AppendLine($"{indent}  \"axis_end\": {{ \"x\": {Number(guide.AxisEnd.X)}, \"y\": {Number(guide.AxisEnd.Y)} }}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendOutput(StringBuilder builder, PolyTextureOutputBinding output, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(output.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(output.Name)}\",");
+        builder.AppendLine($"{indent}  \"kind\": \"{OutputKindToJson(output.Kind)}\",");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(output.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(output.Enabled)},");
+        builder.AppendLine($"{indent}  \"value\": {Number(output.Value)},");
+        builder.AppendLine($"{indent}  \"height_amplitude_cm\": {Number(output.HeightAmplitudeCm)}");
         builder.AppendLine($"{indent}}}{suffix}");
     }
 
@@ -295,6 +315,11 @@ public static class PolyTextureStore
                 }
             }
 
+            foreach (Variant outputVariant in texture["outputs"].AsGodotArray())
+            {
+                item.Outputs.Add(ReadOutput(outputVariant.AsGodotDictionary()));
+            }
+
             document.Textures.Add(item);
         }
 
@@ -378,6 +403,20 @@ public static class PolyTextureStore
             Type = ReadGuideType(ReadString(guide, "type", "point")),
             Position = ReadVector2(guide, "position"),
             AxisEnd = ReadVector2(guide, "axis_end")
+        };
+    }
+
+    private static PolyTextureOutputBinding ReadOutput(Godot.Collections.Dictionary output)
+    {
+        return new PolyTextureOutputBinding
+        {
+            Id = ReadString(output, "id", "output"),
+            Name = ReadString(output, "name", "Output"),
+            Kind = ReadOutputKind(ReadString(output, "kind", "mask")),
+            SourceElementId = ReadString(output, "source_element_id", string.Empty),
+            Enabled = ReadBool(output, "enabled", true),
+            Value = ReadFloat(output, "value", 1.0f),
+            HeightAmplitudeCm = ReadFloat(output, "height_amplitude_cm", 1.0f)
         };
     }
 
@@ -524,6 +563,16 @@ public static class PolyTextureStore
     private static PolyTextureGuideType ReadGuideType(string value)
     {
         return value == "axis" ? PolyTextureGuideType.Axis : PolyTextureGuideType.Point;
+    }
+
+    private static PolyTextureOutputKind ReadOutputKind(string value)
+    {
+        return value == "height" ? PolyTextureOutputKind.Height : PolyTextureOutputKind.Mask;
+    }
+
+    private static string OutputKindToJson(PolyTextureOutputKind kind)
+    {
+        return kind == PolyTextureOutputKind.Height ? "height" : "mask";
     }
 
     private static string GuideTypeToJson(PolyTextureGuideType type)

@@ -126,6 +126,45 @@ public static class PolyTextureValidator
                 }
             }
 
+            HashSet<string> outputIds = new(System.StringComparer.Ordinal);
+            bool hasHeightOutput = false;
+            for (int outputIndex = 0; outputIndex < texture.Outputs.Count; outputIndex++)
+            {
+                PolyTextureOutputBinding output = texture.Outputs[outputIndex];
+                string outputPath = $"{path}.outputs[{outputIndex}]";
+                if (string.IsNullOrWhiteSpace(output.Id) || !outputIds.Add(output.Id))
+                {
+                    error = $"{outputPath}.id must be unique within texture";
+                    return false;
+                }
+                if (string.IsNullOrWhiteSpace(output.Name))
+                {
+                    error = $"{outputPath}.name is required";
+                    return false;
+                }
+                if (!elementIds.Contains(output.SourceElementId))
+                {
+                    error = $"{outputPath}.source_element_id must reference an existing element";
+                    return false;
+                }
+                if (!float.IsFinite(output.Value) || output.Value < 0.0f || output.Value > 1.0f)
+                {
+                    error = $"{outputPath}.value must be between 0 and 1";
+                    return false;
+                }
+                if (!float.IsFinite(output.HeightAmplitudeCm) || output.HeightAmplitudeCm <= 0.0f)
+                {
+                    error = $"{outputPath}.height_amplitude_cm must be finite and positive";
+                    return false;
+                }
+                if (output.Kind == PolyTextureOutputKind.Height && hasHeightOutput)
+                {
+                    error = $"{path} may contain only one height output";
+                    return false;
+                }
+                hasHeightOutput |= output.Kind == PolyTextureOutputKind.Height;
+            }
+
             foreach (PolyTextureElement element in texture.Elements)
             {
                 if (element is SweepGeneratorElement sweep)
@@ -391,6 +430,12 @@ public static class PolyTextureValidator
             {
                 return false;
             }
+
+            if (!RequireArray(texture, "outputs", out Godot.Collections.Array outputs, out error, texturePath)
+                || !ValidateOutputsDictionary(outputs, $"{texturePath}.outputs", elements, out error))
+            {
+                return false;
+            }
         }
 
         if (textures.Count > 0 && !activeTextureExists)
@@ -505,6 +550,56 @@ public static class PolyTextureValidator
                 return false;
             }
         }
+        return true;
+    }
+
+    private static bool ValidateOutputsDictionary(Godot.Collections.Array outputs, string path, Godot.Collections.Array elements, out string error)
+    {
+        error = string.Empty;
+        HashSet<string> elementIds = new(System.StringComparer.Ordinal);
+        foreach (Variant elementVariant in elements)
+        {
+            elementIds.Add(elementVariant.AsGodotDictionary()["id"].AsString());
+        }
+
+        HashSet<string> outputIds = new(System.StringComparer.Ordinal);
+        bool hasHeightOutput = false;
+        for (int outputIndex = 0; outputIndex < outputs.Count; outputIndex++)
+        {
+            if (outputs[outputIndex].VariantType != Variant.Type.Dictionary)
+            {
+                error = $"{path}[{outputIndex}] must be an object";
+                return false;
+            }
+
+            Godot.Collections.Dictionary output = outputs[outputIndex].AsGodotDictionary();
+            string outputPath = $"{path}[{outputIndex}]";
+            if (!RequireString(output, "id", out string id, out error, outputPath)
+                || !RequireString(output, "name", out _, out error, outputPath)
+                || !RequireString(output, "kind", out string kind, out error, outputPath)
+                || !RequireString(output, "source_element_id", out string sourceId, out error, outputPath)
+                || !RequireBool(output, "enabled", out _, out error, outputPath)
+                || !RequireNumber(output, "value", out float value, out error, outputPath)
+                || !RequireNumber(output, "height_amplitude_cm", out float amplitude, out error, outputPath))
+            {
+                return false;
+            }
+
+            bool isHeight = kind.Equals("height", System.StringComparison.Ordinal);
+            if ((!isHeight && !kind.Equals("mask", System.StringComparison.Ordinal))
+                || string.IsNullOrWhiteSpace(id)
+                || !outputIds.Add(id)
+                || !elementIds.Contains(sourceId)
+                || !float.IsFinite(value) || value < 0.0f || value > 1.0f
+                || !float.IsFinite(amplitude) || amplitude <= 0.0f
+                || isHeight && hasHeightOutput)
+            {
+                error = $"{outputPath} contains an invalid output binding";
+                return false;
+            }
+            hasHeightOutput |= isHeight;
+        }
+
         return true;
     }
 
