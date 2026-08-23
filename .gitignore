@@ -3,3 +3,7 @@
 bin/
 obj/
 *.user
+/output/*
+!/output/.gdignore
+/savefiles/*
+!/savefiles/.gdignore

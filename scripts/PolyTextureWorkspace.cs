@@ -28,7 +28,8 @@ public partial class PolyTextureWorkspace : Control
         Preview
     }
 
-    private const string DefaultDocumentPath = "res://untitled.polytexture.json";
+    private static string DefaultSaveDirectory => ProjectSettings.GlobalizePath("res://savefiles");
+    private static string DefaultDocumentPath => DefaultSaveDirectory.PathJoin("untitled.polytexture.json");
     private static readonly float[] SnapStepPresets = { 0.78125f, 1.5625f, 3.125f, 6.25f, 12.5f, 25.0f, 50.0f, 100.0f };
     private const int DrawCenterStrokeMenuId = 1;
     private const int DrawCenterPathMenuId = 2;
@@ -294,10 +295,11 @@ public partial class PolyTextureWorkspace : Control
 
     private void BuildFileDialogs()
     {
+        DirAccess.MakeDirRecursiveAbsolute(DefaultSaveDirectory);
         _loadDialog = new FileDialog
         {
             FileMode = FileDialog.FileModeEnum.OpenFile,
-            Access = FileDialog.AccessEnum.Resources,
+            Access = FileDialog.AccessEnum.Filesystem,
             Title = "Load PolyTexture JSON"
         };
         _loadDialog.AddFilter("*.polytexture.json ; PolyTexture JSON");
@@ -307,7 +309,7 @@ public partial class PolyTextureWorkspace : Control
         _saveAsDialog = new FileDialog
         {
             FileMode = FileDialog.FileModeEnum.SaveFile,
-            Access = FileDialog.AccessEnum.Resources,
+            Access = FileDialog.AccessEnum.Filesystem,
             Title = "Save PolyTexture JSON"
         };
         _saveAsDialog.AddFilter("*.polytexture.json ; PolyTexture JSON");
@@ -1049,14 +1051,25 @@ public partial class PolyTextureWorkspace : Control
 
     private void OpenLoadDialog()
     {
-        _loadDialog.CurrentPath = string.IsNullOrEmpty(_documentPath) ? DefaultDocumentPath : _documentPath;
+        string path = string.IsNullOrEmpty(_documentPath) ? DefaultDocumentPath : GlobalizeDocumentPath(_documentPath);
+        _loadDialog.CurrentDir = path.GetBaseDir();
+        _loadDialog.CurrentFile = string.Empty;
         _loadDialog.PopupCenteredRatio(0.6f);
     }
 
     private void OpenSaveAsDialog()
     {
-        _saveAsDialog.CurrentPath = string.IsNullOrEmpty(_documentPath) ? DefaultDocumentPath : _documentPath;
+        string path = string.IsNullOrEmpty(_documentPath) ? DefaultDocumentPath : GlobalizeDocumentPath(_documentPath);
+        _saveAsDialog.CurrentDir = path.GetBaseDir();
+        _saveAsDialog.CurrentFile = path.GetFile();
         _saveAsDialog.PopupCenteredRatio(0.6f);
+    }
+
+    private static string GlobalizeDocumentPath(string path)
+    {
+        return path.StartsWith("res://", StringComparison.Ordinal) || path.StartsWith("user://", StringComparison.Ordinal)
+            ? ProjectSettings.GlobalizePath(path)
+            : path;
     }
 
     private void LoadDocumentFromPath(string path)
