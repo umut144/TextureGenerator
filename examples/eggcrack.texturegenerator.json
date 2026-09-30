@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "document_type": "texturegenerator",
+  "name": "eggcrack",
+  "preview_defaults": {
+    "width_px": 512,
+    "height_px": 512
+  },
+  "snap_enabled": false,
+  "snap_step_cm": 12.5,
+  "active_texture_id": "crack01",
+  "active_element_id": "edge_falloff",
+  "active_guide_id": "",
+  "active_output_id": "",
+  "selection_kind": "element",
+  "selected_point_index": -1,
+  "textures": [
+    {
+      "id": "crack01",
+      "name": "crack",
+      "origin": "bottom_left",
+      "domain": {
+        "width_cm": 400,
+        "height_cm": 400
+      },
+      "preview": {
+        "width_px": 512,
+        "height_px": 512
+      },
+      "visible": true,
+      "elements": [
+        {
+          "id": "crack_line",
+          "name": "Crack Line",
+          "type": "crack_line",
+          "enabled": true,
+          "opacity": 0.86,
+          "symmetry": true,
+          "falloff": 0,
+          "transform": {
+            "position": { "x": 199.429, "y": 1.371 },
+            "rotation_degrees": 39.512,
+            "length_scale": 1,
+            "width_scale": 1
+          },
+          "points": [
+            { "x": 0, "y": 0, "left_width": 1, "right_width": 1, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } },
+            { "x": 59.995, "y": 0, "left_width": 1, "right_width": 1, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } },
+            { "x": 121.821, "y": 42.635, "left_width": 1, "right_width": 1, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } },
+            { "x": 77.853, "y": 113.263, "left_width": 1, "right_width": 1, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } },
+            { "x": 85.675, "y": 168.733, "left_width": 1, "right_width": 1, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } }
+          ]
+        },
+        {
+          "id": "branch",
+          "name": "Branch",
+          "type": "branch",
+          "enabled": true,
+          "opacity": 0.86,
+          "source_element_id": "crack_line",
+          "seed": 9,
+          "count": 10,
+          "segments": 4,
+          "start_t": 0.11,
+          "end_t": 0.92,
+          "length_min_cm": 32,
+          "length_max_cm": 100,
+          "angle_min_degrees": 25,
+          "angle_max_degrees": 44,
+          "width_scale": 0.9,
+          "irregularity": 0.36,
+          "render_source": true
+        },
+        {
+          "id": "edge_falloff",
+          "name": "Edge Falloff",
+          "type": "edge_falloff",
+          "enabled": true,
+          "opacity": 0.86,
+          "source_element_id": "branch",
+          "radius_cm": 0.8,
+          "exponent": 0.67
+        },
+        {
+          "id": "invert",
+          "name": "Invert",
+          "type": "invert",
+          "enabled": true,
+          "opacity": 0.86,
+          "source_element_id": "edge_falloff"
+        },
+        {
+          "id": "crack_line_2",
+          "name": "Crack Line",
+          "type": "crack_line",
+          "enabled": true,
+          "opacity": 0.86,
+          "symmetry": true,
+          "falloff": 0,
+          "transform": {
+            "position": { "x": 0, "y": 0 },
+            "rotation_degrees": 0,
+            "length_scale": 1,
+            "width_scale": 1
+          },
+          "points": [
+          ]
+        },
+        {
+          "id": "crack_line_3",
+          "name": "Crack Line",
+          "type": "crack_line",
+          "enabled": true,
+          "opacity": 0.86,
+          "symmetry": true,
+          "falloff": 0,
+          "transform": {
+            "position": { "x": 163.543, "y": 275.429 },
+            "rotation_degrees": 0,
+            "length_scale": 1,
+            "width_scale": 1
+          },
+          "points": [
+            { "x": 0, "y": 0, "left_width": 2, "right_width": 2, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } }
+          ]
+        },
+        {
+          "id": "crack_line_4",
+          "name": "Crack Line",
+          "type": "crack_line",
+          "enabled": true,
+          "opacity": 0.86,
+          "symmetry": true,
+          "falloff": 0,
+          "transform": {
+            "position": { "x": 110.286, "y": 270.171 },
+            "rotation_degrees": 0,
+            "length_scale": 1,
+            "width_scale": 1
+          },
+          "points": [
+            { "x": 0, "y": 0, "left_width": 12, "right_width": 12, "handle_mode": "aligned", "in_handle": { "x": 0, "y": 0 }, "out_handle": { "x": 0, "y": 0 } }
+          ]
+        }
+      ],
+      "guides": [
+      ],
+      "outputs": [
+        {
+          "id": "mask",
+          "name": "crack_hard",
+          "kind": "mask",
+          "source_element_ids": ["branch"],
+          "enabled": true,
+          "value": 1,
+          "height_amplitude_cm": 1
+        },
+        {
+          "id": "mask_2",
+          "name": "crack_soft",
+          "kind": "mask",
+          "source_element_ids": ["edge_falloff"],
+          "enabled": true,
+          "value": 1,
+          "height_amplitude_cm": 1
+        },
+        {
+          "id": "height",
+          "name": "crack_height",
+          "kind": "height",
+          "source_element_ids": ["invert"],
+          "enabled": true,
+          "value": 1,
+          "height_amplitude_cm": 1
+        }
+      ]
+    }
+  ]
+}

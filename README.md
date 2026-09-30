@@ -1,93 +1,146 @@
 # PolyTexture
 
-**A vector-first, procedural texture authoring tool for finished 3D meshes, built with Godot 4 and C#.**
+A stand-alone texture authoring tool for Godot 4 (C#). You draw regions and paths in physical units (centimeters),
+stack generators and filters on top of them, and bake the result to Height, Mask and derived Normal PNG files.
 
-Instead of painting pixels, artists author *resolution-independent semantic information* (regions, paths, rules) and
-let a deterministic evaluator turn it into textures. Raster images and shaders are evaluation and export targets, never
-the source of truth. Change the resolution, the seed, or a single parameter, and the whole result updates without
-losing quality or repainting anything.
+It is a personal project, and it is developed in the open. It is not released, has no packaged build, and has no
+stable file format beyond the current schema version.
 
-## What it does
+<!-- TODO: Screenshot of the editor (workspace.png): canvas with the eggcrack example loaded, outliner on the left,
+     Branch or Edge Falloff selected so the inspector and the scalar debug preview are visible. -->
 
-- **Procedural, non-destructive workflow.** A texture is a stack of Sources, Generators, Operators and Filters. Every
-  step stays editable, and results are derived live from the canonical data.
-- **Resolution-independent authoring.** All geometry is stored in physical units (centimeters). Preview and bake
-  resolution are separate evaluation settings, so changing resolution never rescales or degrades authored data.
-- **Deterministic output.** The same document and seed always produce the same result, which makes bakes reproducible,
-  testable and diff-able.
-- **Semantic outputs instead of baked-in channels.** Color, Height and named Masks are authored as independent
-  information. Normal maps are always *derived* from Height, and RGBA channel packing is only an export optimization.
-- **Live canvas, inspector and outliner** with Bezier path editing, multi-point selection, undo/redo history and
-  a debug heatmap view for intermediate scalar fields.
+## Motivation
 
-## Tool model
+Pixel-painted textures lose information: once a crack or a brick pattern is rasterized, its resolution, seed and
+parameters are gone. This project explores the opposite approach: keep the authored structure (regions, paths, rules,
+a seed) as the source of truth and treat every raster image as a rebuildable result. Changing the preview resolution,
+the seed or one parameter re-evaluates the whole texture.
 
-| Category | Purpose | Examples |
-| --- | --- | --- |
-| **Source** | Authored points, paths and regions | Rectangle Region, Ellipse Region, Crack Line |
-| **Generator** | Creates new structure from inputs | Sweep, Repeat Grid, Branch, Scatter |
-| **Operator** | Transforms or combines existing structure | Mirror |
-| **Filter** | Changes a generated field | Invert, Edge Falloff |
-| **Output** | Gives an evaluated field its meaning | Color, Height, named Mask |
+## What it can do today
 
-Low-level tools give technical artists full control. The architecture is designed so that reusable, versioned
-**Recipes** and higher-level domain tools (for example "Cracked Surface" or "Mold Colonies") can later be composed from
-the same primitives rather than introducing a second authoring model.
+- Author **Sources**: Rectangle Region, Ellipse Region, Crack Line (Bezier path with per-point width), generic
+  center paths and guides.
+- Derive structure with **Generators**: Sweep, Repeat Grid (staggered rows, clipped to the surface), Branch (recursive
+  crack branching) and Scatter (clustered, seeded instances with scale and rotation variation).
+- Transform with the **Operator** Mirror and change scalar fields with the **Filters** Invert and Edge Falloff. A
+  selected filter shows a contrast-enhanced heatmap of its field as a debug preview.
+- Bind results to **Outputs**: Height, named Masks. A Normal map is always derived from a Height output, never
+  authored.
+- Edit on a canvas with an outliner, inspector, multi-point selection, undo/redo, and Save/Load of JSON documents.
+- Export each output as a grayscale PNG (Normal as RGB PNG).
 
-## Example results (implemented vertical slices)
+Not implemented yet: Color output, decals or object-bound symbols, reusable Recipes, RGBA channel packing, the
+Freeze/Make Editable operation, and any runtime import into a game. `docs/ARCHITECTURE.md` describes these as the
+design direction, not as existing features.
 
-- **Brick wall:** Rectangle Region, Repeat Grid with staggered rows, Invert for mortar, exported as separate Mask and
-  Height maps.
-- **Cracks:** hand-drawn semantic crack paths with per-point width, deterministic recursive Branch generation and
-  Edge Falloff for a physically sized gradient.
-- **Mold colonies:** Ellipse Region prototypes distributed by a clustered, seeded Scatter with scale and rotation
-  variation, optionally restricted to a bounding region.
+## Workflow
 
-## Engineering highlights
+1. Create or load a document (`Load JSON...`). The file dialog starts in `savefiles/`.
+2. Add Sources (`Draw` / `Sources` menus), then Generators, Operators and Filters (`Generator`, `Operator`, `Filter`
+   menus). Each element only references elements above it in the stack.
+3. Create an Output (`+ Height`, `+ Mask`). With an element selected, only that element is bound. Without a selection,
+   the whole visible graph is bound.
+4. `Preview`, then `Export PNG...`. A Height output additionally offers `Preview Normal` and `Export Normal...`.
 
-- **Clean separation of canonical data and derived data.** Sources, operations and output bindings are the only
-  persisted truth. Evaluation results, previews and bakes are rebuildable and carry provenance.
-- **Pure evaluator.** A deterministic evaluation stage never mutates the document; canvas, inspector, bake service
-  and export all consume the same evaluated result.
-- **Stable IDs everywhere.** References use immutable technical IDs, so renaming never breaks the graph. Duplication
-  remaps references atomically, and deletion is dependency-aware.
-- **Graph validation.** Missing inputs, incompatible port types and cycles are rejected before evaluation.
-- **Explicit schema policy.** The document format is versioned, and unsupported schema versions are rejected instead
-  of being silently migrated.
-- **Automated tests.** A headless test runner with 28 tests covers serialization round trips, determinism of every
-  generator, validation, dependency handling and baking (including derived normal maps).
+Example result from [`examples/eggcrack.polytexture.json`](examples/eggcrack.polytexture.json) (400 x 400 cm surface,
+512 x 512 px): hand-drawn crack lines, recursive Branch generation, Invert, exported as Height and derived Normal.
 
-Roughly 11,000 lines of C# across the document model, evaluator, renderer, bake and export services, and the editor UI.
+| Height | Normal (derived from Height) |
+| --- | --- |
+| ![Height map of a branching crack](docs/images/eggcrack_height.png) | ![Normal map derived from the height map](docs/images/eggcrack_normal.png) |
 
-## Tech stack
+<!-- TODO: GIF (about 10 s) of drawing a Crack Line, adding Branch, and watching the canvas update live. -->
 
-- Godot 4.7 (Forward Plus renderer) with C# / .NET
-- JSON document persistence, PNG export for baked maps
+Other setups covered by the automated tests: a brick wall (Rectangle Region, Repeat Grid with staggered rows, Invert
+for mortar, separate Mask and Height outputs) and clustered scatter of Ellipse Regions.
 
-## Getting started
+## Document format
 
-1. Install the **.NET-enabled (Mono) build of Godot 4.7**.
-2. Clone the repository and open `project.godot` in the Godot editor.
-3. Run the project. It starts in `scenes/PolyTextureWorkspace.tscn`.
+A document is one JSON file (`*.polytexture.json`, `schema_version: 1`). Unsupported schema versions are rejected, not
+migrated. It stores only canonical data: textures with a physical `domain` in centimeters, an ordered list of
+`elements`, and `outputs` that reference elements by stable ID. Evaluated geometry and bakes are not stored.
 
-Saved documents go to `savefiles/`, and PNG bakes are written to `output/`. Both folders are git-ignored.
+```json
+{
+  "schema_version": 1,
+  "document_type": "polytexture",
+  "textures": [
+    {
+      "id": "texture_101",
+      "domain":  { "width_cm": 400, "height_cm": 400 },
+      "preview": { "width_px": 512, "height_px": 512 },
+      "elements": [
+        { "id": "ellipse_region", "type": "ellipse_region",
+          "position": { "x": 200, "y": 200 }, "width_cm": 240, "height_cm": 200 }
+      ],
+      "outputs": [
+        { "id": "height", "name": "crack_height", "kind": "height",
+          "source_element_ids": ["invert"], "height_amplitude_cm": 1 }
+      ]
+    }
+  ]
+}
+```
 
-### Build and test
+The exchange format towards other projects is the exported PNG set. There is no runtime loader for the JSON documents.
+Field meanings are documented in [`docs/DOCUMENT_MODEL.md`](docs/DOCUMENT_MODEL.md).
+
+## Technical notes
+
+- The whole project is C# (`net9.0`, `Godot.NET.Sdk 4.7.1`, Forward Plus renderer). There is no C++ or GDExtension
+  code. It is a stand-alone Godot application (main scene `scenes/PolyTextureWorkspace.tscn`), not an editor plugin.
+- Evaluation is a pure function of the document: it does not modify the document, and canvas, inspector and bake
+  service all use the same evaluated result. The same document and seed give the same output.
+- References use immutable IDs, so renaming does not break the graph. Validation rejects missing inputs, incompatible
+  port types and cycles before evaluation.
+- About 11,900 lines of C# in `scripts/` and `tests/`.
+
+## Requirements and setup
+
+- Godot 4.7 **.NET (Mono) build**, .NET SDK 9
 
 ```bash
-dotnet build --no-restore
+git clone https://github.com/umut144/texture_workshop.git
+cd texture_workshop
+dotnet build
+```
+
+Then open `project.godot` in the Godot editor and run the project. Saved documents go to `savefiles/` and PNG exports
+default to `output/`; both folders are git-ignored.
+
+## Tests
+
+A headless test runner with 28 tests covers serialization round trips, determinism of each generator, validation,
+dependency-aware deletion, baking and the normal map derivation.
+
+```bash
 godot --headless --path . -s res://tests/PolyTextureTestRunner.cs
 ```
 
-## Documentation
+There is no CI. The runner exits with a non-zero code when a test fails.
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): product vocabulary, evaluation boundary, dependency rules and
-  tool abstraction levels
-- [`docs/DOCUMENT_MODEL.md`](docs/DOCUMENT_MODEL.md): canonical document model, identity, coordinates and outputs
-- [`AGENTS.md`](AGENTS.md): ownership rules and verification steps for contributors
+## Project structure
 
-## Status and roadmap
+- `scripts/`: document model, evaluator, validator, renderer, bake service and editor UI (C#)
+- `scenes/`: the single workspace scene
+- `tests/`: headless test runner
+- `examples/`: a sample document
+- `docs/`: architecture and document model notes, example images
+- `savefiles/`, `output/`: local working folders (contents ignored by git)
 
-PolyTexture is an actively developed personal project. The next planned slice covers object-bound symbols and decals
-(for example a pair of books) together with reusable, versioned material Recipes, plus a library of material-bound
-procedural textures and animation-ready reveal metadata for runtime shaders.
+## Status and next steps
+
+The tools above work in manual testing, and the automated tests passed at the last documented checkpoint. The next
+planned slice is object-bound symbols or decals and reusable Recipes. Material-bound texture libraries and
+animation-ready reveal metadata for runtime shaders are planned after that. Numeric values such as Scatter clustering
+have had little tuning on real content.
+
+## Further reading
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): vocabulary, evaluation boundary, dependency rules
+- [`docs/DOCUMENT_MODEL.md`](docs/DOCUMENT_MODEL.md): canonical model, identity, coordinates, outputs
+
+## License
+
+<!-- TODO: add a LICENSE file and name it here (MIT suggested). Not yet chosen. -->
+No license has been chosen yet. Until one is added, all rights are reserved.
