@@ -1,9 +1,9 @@
-# PolyTexture Document Model
+# TextureGenerator Document Model
 
 ## Target canonical model
 
 ```text
-PolyTextureDocument
+TextureGeneratorDocument
 |- SurfaceDomain
 |- Sources
 |- Controls
@@ -11,18 +11,18 @@ PolyTextureDocument
 |- RecipeInstances
 `- OutputBindings
 
-PolyTextureEditorState
+TextureGeneratorEditorState
 |- Selection
 |- Outliner expansion
 |- Preview mode
 `- View transform
 
-PolyTextureDerivedData
+TextureGeneratorDerivedData
 |- TransientPreview
 `- AcceptedBakes
 ```
 
-`PolyTextureEditorState` and `PolyTextureDerivedData` are not semantic source
+`TextureGeneratorEditorState` and `TextureGeneratorDerivedData` are not semantic source
 content. They may be stored beside a document for convenience but must not
 participate in source fingerprints.
 

@@ -1,0 +1,19 @@
+using System.Collections.Generic;
+
+public sealed class TextureGeneratorEvaluationResult
+{
+    public HashSet<string> HiddenSourceIds { get; } = new(System.StringComparer.Ordinal);
+    public List<SweepGeneratorElement> LiveSweeps { get; } = new();
+    public List<MirrorGeneratorElement> LiveMirrors { get; } = new();
+    public List<RepeatGridGeneratorElement> LiveRepeatGrids { get; } = new();
+    public List<BranchGeneratorElement> LiveBranches { get; } = new();
+    public List<ScatterGeneratorElement> LiveScatters { get; } = new();
+    public Dictionary<string, List<List<Godot.Vector2>>> GeometryByElementId { get; } = new(System.StringComparer.Ordinal);
+
+    public List<List<Godot.Vector2>> GetGeometry(string elementId)
+    {
+        return GeometryByElementId.TryGetValue(elementId, out List<List<Godot.Vector2>> geometry)
+            ? geometry
+            : new List<List<Godot.Vector2>>();
+    }
+}

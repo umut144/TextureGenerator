@@ -1,12 +1,12 @@
 # Temporary Session Handoff
 
-Delete this file once the next PolyTexture session has read and incorporated
+Delete this file once the next TextureGenerator session has read and incorporated
 the remaining product context. The durable technical contracts live in
 `AGENTS.md`, `docs/ARCHITECTURE.md`, and `docs/DOCUMENT_MODEL.md`.
 
 ## Current direction
 
-PolyTexture is a vector-first, procedural texture authoring tool for finished
+TextureGenerator is a vector-first, procedural texture authoring tool for finished
 meshes. Artists should author resolution-independent semantic information with
 Sources, Generators, Operators, Filters, and eventually reusable Recipes.
 Raster textures and shaders are evaluation/export targets rather than the

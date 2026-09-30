@@ -1,10 +1,10 @@
 using Godot;
 
-public sealed class CenterStrokePoint : PolyTexturePoint
+public sealed class CenterStrokePoint : TextureGeneratorPoint
 {
     public float LeftWidth { get; set; }
     public float RightWidth { get; set; }
-    public PolyTextureHandleMode HandleMode { get; set; } = PolyTextureHandleMode.Linear;
+    public TextureGeneratorHandleMode HandleMode { get; set; } = TextureGeneratorHandleMode.Linear;
     public Vector2 InHandle { get; set; }
     public Vector2 OutHandle { get; set; }
 

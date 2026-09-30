@@ -1,0 +1,994 @@
+using Godot;
+using System.Globalization;
+using System.Text;
+
+public static class TextureGeneratorStore
+{
+    public static bool Save(string path, TextureGeneratorDocument document, out string error)
+    {
+        error = string.Empty;
+
+        if (!TextureGeneratorValidator.Validate(document, out error))
+        {
+            return false;
+        }
+
+        string json = ToJson(document);
+        if (!TextureGeneratorValidator.ValidateJson(json, out error))
+        {
+            return false;
+        }
+
+        EnsureDirectory(GetPathDirectory(path));
+        using FileAccess file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
+        if (file == null)
+        {
+            error = $"could not open for write: {path}";
+            return false;
+        }
+
+        file.StoreString(json);
+        return true;
+    }
+
+    public static bool Load(string path, out TextureGeneratorDocument document, out string error)
+    {
+        document = null;
+        error = string.Empty;
+
+        if (!FileAccess.FileExists(path))
+        {
+            error = $"file not found: {path}";
+            return false;
+        }
+
+        using FileAccess file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (file == null)
+        {
+            error = $"could not open for read: {path}";
+            return false;
+        }
+
+        string json = file.GetAsText();
+        if (!TextureGeneratorValidator.ValidateJson(json, out error))
+        {
+            return false;
+        }
+
+        Json parser = new();
+        if (parser.Parse(json) != Error.Ok || parser.Data.VariantType != Variant.Type.Dictionary)
+        {
+            error = "validated JSON could not be parsed";
+            return false;
+        }
+
+        document = FromDictionary(parser.Data.AsGodotDictionary());
+        return TextureGeneratorValidator.Validate(document, out error);
+    }
+
+    public static string ToJson(TextureGeneratorDocument document)
+    {
+        document.EnsureSelection();
+
+        StringBuilder builder = new();
+        builder.AppendLine("{");
+        builder.AppendLine($"  \"schema_version\": {document.SchemaVersion},");
+        builder.AppendLine($"  \"document_type\": \"{EscapeJson(document.DocumentType)}\",");
+        builder.AppendLine($"  \"name\": \"{EscapeJson(document.Name)}\",");
+        builder.AppendLine("  \"preview_defaults\": {");
+        builder.AppendLine($"    \"width_px\": {document.DefaultPreviewWidthPx},");
+        builder.AppendLine($"    \"height_px\": {document.DefaultPreviewHeightPx}");
+        builder.AppendLine("  },");
+        builder.AppendLine($"  \"snap_enabled\": {JsonBool(document.SnapEnabled)},");
+        builder.AppendLine($"  \"snap_step_cm\": {Number(document.SnapStepCm)},");
+        builder.AppendLine($"  \"active_texture_id\": \"{EscapeJson(document.ActiveTextureId)}\",");
+        builder.AppendLine($"  \"active_element_id\": \"{EscapeJson(document.ActiveElementId)}\",");
+        builder.AppendLine($"  \"active_guide_id\": \"{EscapeJson(document.ActiveGuideId)}\",");
+        builder.AppendLine($"  \"active_output_id\": \"{EscapeJson(document.ActiveOutputId)}\",");
+        builder.AppendLine($"  \"selection_kind\": \"{EscapeJson(document.SelectionKind.ToString().ToLowerInvariant())}\",");
+        builder.AppendLine($"  \"selected_point_index\": {document.SelectedPointIndex},");
+        builder.AppendLine("  \"textures\": [");
+
+        for (int textureIndex = 0; textureIndex < document.Textures.Count; textureIndex++)
+        {
+            TextureGeneratorItem texture = document.Textures[textureIndex];
+            string textureSuffix = textureIndex == document.Textures.Count - 1 ? string.Empty : ",";
+            builder.AppendLine("    {");
+            builder.AppendLine($"      \"id\": \"{EscapeJson(texture.Id)}\",");
+            builder.AppendLine($"      \"name\": \"{EscapeJson(texture.Name)}\",");
+            builder.AppendLine($"      \"origin\": \"{EscapeJson(OriginModeToJson(texture.OriginMode))}\",");
+            builder.AppendLine("      \"domain\": {");
+            builder.AppendLine($"        \"width_cm\": {Number(texture.DomainWidthCm)},");
+            builder.AppendLine($"        \"height_cm\": {Number(texture.DomainHeightCm)}");
+            builder.AppendLine("      },");
+            builder.AppendLine("      \"preview\": {");
+            builder.AppendLine($"        \"width_px\": {texture.PreviewWidthPx},");
+            builder.AppendLine($"        \"height_px\": {texture.PreviewHeightPx}");
+            builder.AppendLine("      },");
+            builder.AppendLine($"      \"visible\": {JsonBool(texture.Visible)},");
+            builder.AppendLine("      \"elements\": [");
+            for (int elementIndex = 0; elementIndex < texture.Elements.Count; elementIndex++)
+            {
+                string elementSuffix = elementIndex == texture.Elements.Count - 1 ? string.Empty : ",";
+                AppendElement(builder, texture.Elements[elementIndex], "        ", elementSuffix);
+            }
+            builder.AppendLine("      ],");
+            builder.AppendLine("      \"guides\": [");
+            for (int guideIndex = 0; guideIndex < texture.Guides.Count; guideIndex++)
+            {
+                string guideSuffix = guideIndex == texture.Guides.Count - 1 ? string.Empty : ",";
+                AppendGuide(builder, texture.Guides[guideIndex], "        ", guideSuffix);
+            }
+            builder.AppendLine("      ],");
+            builder.AppendLine("      \"outputs\": [");
+            for (int outputIndex = 0; outputIndex < texture.Outputs.Count; outputIndex++)
+            {
+                string outputSuffix = outputIndex == texture.Outputs.Count - 1 ? string.Empty : ",";
+                AppendOutput(builder, texture.Outputs[outputIndex], "        ", outputSuffix);
+            }
+            builder.AppendLine("      ]");
+            builder.AppendLine($"    }}{textureSuffix}");
+        }
+
+        builder.AppendLine("  ]");
+        builder.AppendLine("}");
+        return builder.ToString();
+    }
+
+    private static void AppendElement(StringBuilder builder, TextureGeneratorElement element, string indent, string suffix)
+    {
+        if (element is RectangleRegionElement rectangleRegion)
+        {
+            AppendRectangleRegion(builder, rectangleRegion, indent, suffix);
+        }
+        else if (element is EllipseRegionElement ellipseRegion)
+        {
+            AppendEllipseRegion(builder, ellipseRegion, indent, suffix);
+        }
+        else if (element is MirrorGeneratorElement mirror)
+        {
+            AppendMirror(builder, mirror, indent, suffix);
+        }
+        else if (element is RepeatGridGeneratorElement repeat)
+        {
+            AppendRepeatGrid(builder, repeat, indent, suffix);
+        }
+        else if (element is BranchGeneratorElement branch)
+        {
+            AppendBranch(builder, branch, indent, suffix);
+        }
+        else if (element is ScatterGeneratorElement scatter)
+        {
+            AppendScatter(builder, scatter, indent, suffix);
+        }
+        else if (element is InvertFilterElement invert)
+        {
+            AppendInvert(builder, invert, indent, suffix);
+        }
+        else if (element is EdgeFalloffFilterElement falloff)
+        {
+            AppendEdgeFalloff(builder, falloff, indent, suffix);
+        }
+        else if (element is SweepGeneratorElement sweep)
+        {
+            AppendSweep(builder, sweep, indent, suffix);
+        }
+        else if (element is CrackLineElement crackLine)
+        {
+            AppendCenterStroke(builder, crackLine, includeBezierData: true, indent, suffix);
+        }
+        else if (element is CenterPathElement centerPath)
+        {
+            AppendCenterStroke(builder, centerPath, includeBezierData: true, indent, suffix);
+        }
+        else if (element is CenterStrokeElement centerStroke)
+        {
+            AppendCenterStroke(builder, centerStroke, includeBezierData: false, indent, suffix);
+        }
+    }
+
+    private static void AppendInvert(StringBuilder builder, InvertFilterElement invert, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(invert.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(invert.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{InvertFilterElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(invert.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(invert.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(invert.SourceElementId)}\"");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendEdgeFalloff(StringBuilder builder, EdgeFalloffFilterElement falloff, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(falloff.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(falloff.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{EdgeFalloffFilterElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(falloff.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(falloff.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(falloff.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"radius_cm\": {Number(falloff.RadiusCm)},");
+        builder.AppendLine($"{indent}  \"exponent\": {Number(falloff.Exponent)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendRepeatGrid(StringBuilder builder, RepeatGridGeneratorElement repeat, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(repeat.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(repeat.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{RepeatGridGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(repeat.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(repeat.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(repeat.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"columns\": {repeat.Columns},");
+        builder.AppendLine($"{indent}  \"rows\": {repeat.Rows},");
+        builder.AppendLine($"{indent}  \"step_x_cm\": {Number(repeat.StepXCm)},");
+        builder.AppendLine($"{indent}  \"step_y_cm\": {Number(repeat.StepYCm)},");
+        builder.AppendLine($"{indent}  \"alternate_row_offset_x_cm\": {Number(repeat.AlternateRowOffsetXCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendBranch(StringBuilder builder, BranchGeneratorElement branch, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(branch.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(branch.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{BranchGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(branch.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(branch.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(branch.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"seed\": {branch.Seed},");
+        builder.AppendLine($"{indent}  \"count\": {branch.Count},");
+        builder.AppendLine($"{indent}  \"segments\": {branch.Segments},");
+        builder.AppendLine($"{indent}  \"depth\": {branch.Depth},");
+        builder.AppendLine($"{indent}  \"children_per_branch\": {branch.ChildrenPerBranch},");
+        builder.AppendLine($"{indent}  \"start_t\": {Number(branch.StartT)},");
+        builder.AppendLine($"{indent}  \"end_t\": {Number(branch.EndT)},");
+        builder.AppendLine($"{indent}  \"length_min_cm\": {Number(branch.LengthMinCm)},");
+        builder.AppendLine($"{indent}  \"length_max_cm\": {Number(branch.LengthMaxCm)},");
+        builder.AppendLine($"{indent}  \"angle_min_degrees\": {Number(branch.AngleMinDegrees)},");
+        builder.AppendLine($"{indent}  \"angle_max_degrees\": {Number(branch.AngleMaxDegrees)},");
+        builder.AppendLine($"{indent}  \"width_scale\": {Number(branch.WidthScale)},");
+        builder.AppendLine($"{indent}  \"irregularity\": {Number(branch.Irregularity)},");
+        builder.AppendLine($"{indent}  \"depth_length_scale\": {Number(branch.DepthLengthScale)},");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(branch.RenderSource)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendScatter(StringBuilder builder, ScatterGeneratorElement scatter, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(scatter.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(scatter.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{ScatterGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(scatter.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(scatter.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(scatter.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"bounds_element_id\": \"{EscapeJson(scatter.BoundsElementId)}\",");
+        builder.AppendLine($"{indent}  \"seed\": {scatter.Seed},");
+        builder.AppendLine($"{indent}  \"count\": {scatter.Count},");
+        builder.AppendLine($"{indent}  \"cluster_count\": {scatter.ClusterCount},");
+        builder.AppendLine($"{indent}  \"cluster_strength\": {Number(scatter.ClusterStrength)},");
+        builder.AppendLine($"{indent}  \"cluster_radius_cm\": {Number(scatter.ClusterRadiusCm)},");
+        builder.AppendLine($"{indent}  \"scale_min\": {Number(scatter.ScaleMin)},");
+        builder.AppendLine($"{indent}  \"scale_max\": {Number(scatter.ScaleMax)},");
+        builder.AppendLine($"{indent}  \"rotation_min_degrees\": {Number(scatter.RotationMinDegrees)},");
+        builder.AppendLine($"{indent}  \"rotation_max_degrees\": {Number(scatter.RotationMaxDegrees)},");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(scatter.RenderSource)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendRectangleRegion(StringBuilder builder, RectangleRegionElement region, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(region.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(region.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{RectangleRegionElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(region.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(region.Opacity)},");
+        builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(region.Position.X)}, \"y\": {Number(region.Position.Y)} }},");
+        builder.AppendLine($"{indent}  \"rotation_degrees\": {Number(region.RotationDegrees)},");
+        builder.AppendLine($"{indent}  \"width_cm\": {Number(region.WidthCm)},");
+        builder.AppendLine($"{indent}  \"height_cm\": {Number(region.HeightCm)},");
+        builder.AppendLine($"{indent}  \"corner_radius_cm\": {Number(region.CornerRadiusCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendEllipseRegion(StringBuilder builder, EllipseRegionElement region, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(region.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(region.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{EllipseRegionElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(region.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(region.Opacity)},");
+        builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(region.Position.X)}, \"y\": {Number(region.Position.Y)} }},");
+        builder.AppendLine($"{indent}  \"rotation_degrees\": {Number(region.RotationDegrees)},");
+        builder.AppendLine($"{indent}  \"width_cm\": {Number(region.WidthCm)},");
+        builder.AppendLine($"{indent}  \"height_cm\": {Number(region.HeightCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendGuide(StringBuilder builder, TextureGeneratorGuide guide, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(guide.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(guide.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{GuideTypeToJson(guide.Type)}\",");
+        builder.AppendLine($"{indent}  \"position\": {{ \"x\": {Number(guide.Position.X)}, \"y\": {Number(guide.Position.Y)} }},");
+        builder.AppendLine($"{indent}  \"axis_end\": {{ \"x\": {Number(guide.AxisEnd.X)}, \"y\": {Number(guide.AxisEnd.Y)} }}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendOutput(StringBuilder builder, TextureGeneratorOutputBinding output, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(output.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(output.Name)}\",");
+        builder.AppendLine($"{indent}  \"kind\": \"{OutputKindToJson(output.Kind)}\",");
+        builder.Append($"{indent}  \"source_element_ids\": [");
+        for (int sourceIndex = 0; sourceIndex < output.SourceElementIds.Count; sourceIndex++)
+        {
+            string sourceSuffix = sourceIndex == output.SourceElementIds.Count - 1 ? string.Empty : ", ";
+            builder.Append($"\"{EscapeJson(output.SourceElementIds[sourceIndex])}\"{sourceSuffix}");
+        }
+        builder.AppendLine("],");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(output.Enabled)},");
+        builder.AppendLine($"{indent}  \"value\": {Number(output.Value)},");
+        builder.AppendLine($"{indent}  \"height_amplitude_cm\": {Number(output.HeightAmplitudeCm)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendSweep(StringBuilder builder, SweepGeneratorElement sweep, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(sweep.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(sweep.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{SweepGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(sweep.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(sweep.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(sweep.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"target_element_id\": \"{EscapeJson(sweep.TargetElementId)}\",");
+        builder.AppendLine($"{indent}  \"count\": {sweep.Count},");
+        builder.AppendLine($"{indent}  \"start_t\": {Number(sweep.StartT)},");
+        builder.AppendLine($"{indent}  \"end_t\": {Number(sweep.EndT)},");
+        builder.AppendLine($"{indent}  \"alignment\": \"{SweepAlignmentToJson(sweep.Alignment)}\",");
+        builder.AppendLine($"{indent}  \"side_mode\": \"{SweepSideModeToJson(sweep.SideMode)}\",");
+        builder.AppendLine($"{indent}  \"rotation_offset_degrees\": {Number(sweep.RotationOffsetDegrees)},");
+        builder.AppendLine($"{indent}  \"length_scale_start\": {Number(sweep.LengthScaleStart)},");
+        builder.AppendLine($"{indent}  \"length_scale_end\": {Number(sweep.LengthScaleEnd)},");
+        builder.AppendLine($"{indent}  \"width_scale_start\": {Number(sweep.WidthScaleStart)},");
+        builder.AppendLine($"{indent}  \"width_scale_end\": {Number(sweep.WidthScaleEnd)},");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(sweep.RenderSource)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendMirror(StringBuilder builder, MirrorGeneratorElement mirror, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(mirror.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(mirror.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{MirrorGeneratorElement.ElementType}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(mirror.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(mirror.Opacity)},");
+        builder.AppendLine($"{indent}  \"source_element_id\": \"{EscapeJson(mirror.SourceElementId)}\",");
+        builder.AppendLine($"{indent}  \"axis_guide_id\": \"{EscapeJson(mirror.AxisGuideId)}\",");
+        builder.AppendLine($"{indent}  \"render_source\": {JsonBool(mirror.RenderSource)}");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static void AppendCenterStroke(StringBuilder builder, CenterStrokeElement centerStroke, bool includeBezierData, string indent, string suffix)
+    {
+        builder.AppendLine($"{indent}{{");
+        builder.AppendLine($"{indent}  \"id\": \"{EscapeJson(centerStroke.Id)}\",");
+        builder.AppendLine($"{indent}  \"name\": \"{EscapeJson(centerStroke.Name)}\",");
+        builder.AppendLine($"{indent}  \"type\": \"{EscapeJson(centerStroke.Type)}\",");
+        builder.AppendLine($"{indent}  \"enabled\": {JsonBool(centerStroke.Enabled)},");
+        builder.AppendLine($"{indent}  \"opacity\": {Number(centerStroke.Opacity)},");
+        builder.AppendLine($"{indent}  \"symmetry\": {JsonBool(centerStroke.Symmetry)},");
+        builder.AppendLine($"{indent}  \"falloff\": {Number(centerStroke.Falloff)},");
+        builder.AppendLine($"{indent}  \"transform\": {{");
+        builder.AppendLine($"{indent}    \"position\": {{ \"x\": {Number(centerStroke.Transform.Position.X)}, \"y\": {Number(centerStroke.Transform.Position.Y)} }},");
+        builder.AppendLine($"{indent}    \"rotation_degrees\": {Number(centerStroke.Transform.RotationDegrees)},");
+        builder.AppendLine($"{indent}    \"length_scale\": {Number(centerStroke.Transform.LengthScale)},");
+        builder.AppendLine($"{indent}    \"width_scale\": {Number(centerStroke.Transform.WidthScale)}");
+        builder.AppendLine($"{indent}  }},");
+        builder.AppendLine($"{indent}  \"points\": [");
+
+        for (int pointIndex = 0; pointIndex < centerStroke.Points.Count; pointIndex++)
+        {
+            CenterStrokePoint point = centerStroke.Points[pointIndex];
+            string pointSuffix = pointIndex == centerStroke.Points.Count - 1 ? string.Empty : ",";
+            builder.Append($"{indent}    {{ ");
+            builder.Append($"\"x\": {Number(point.X)}, ");
+            builder.Append($"\"y\": {Number(point.Y)}, ");
+            builder.Append($"\"left_width\": {Number(point.LeftWidth)}, ");
+            builder.Append($"\"right_width\": {Number(point.RightWidth)}");
+            if (includeBezierData)
+            {
+                builder.Append($", \"handle_mode\": \"{EscapeJson(HandleModeToJson(point.HandleMode))}\"");
+                builder.Append($", \"in_handle\": {{ \"x\": {Number(point.InHandle.X)}, \"y\": {Number(point.InHandle.Y)} }}");
+                builder.Append($", \"out_handle\": {{ \"x\": {Number(point.OutHandle.X)}, \"y\": {Number(point.OutHandle.Y)} }}");
+            }
+            builder.Append(' ');
+            builder.AppendLine($"}}{pointSuffix}");
+        }
+
+        builder.AppendLine($"{indent}  ]");
+        builder.AppendLine($"{indent}}}{suffix}");
+    }
+
+    private static TextureGeneratorDocument FromDictionary(Godot.Collections.Dictionary root)
+    {
+        Godot.Collections.Dictionary previewDefaults = root["preview_defaults"].AsGodotDictionary();
+        Godot.Collections.Array textures = root["textures"].AsGodotArray();
+        int defaultPreviewWidth = ReadInt(previewDefaults, "width_px", 512);
+        int defaultPreviewHeight = ReadInt(previewDefaults, "height_px", 512);
+        TextureGeneratorDocument document = new()
+        {
+            SchemaVersion = TextureGeneratorDocument.CurrentSchemaVersion,
+            DocumentType = root["document_type"].AsString(),
+            Name = root.ContainsKey("name") && root["name"].VariantType == Variant.Type.String ? root["name"].AsString() : "Untitled",
+            DefaultPreviewWidthPx = defaultPreviewWidth,
+            DefaultPreviewHeightPx = defaultPreviewHeight,
+            SnapEnabled = ReadBool(root, "snap_enabled", false),
+            SnapStepCm = ReadFloat(root, "snap_step_cm", TextureGeneratorUnits.DefaultSnapStepCm),
+            ActiveTextureId = root["active_texture_id"].AsString(),
+            ActiveElementId = ReadString(root, "active_element_id", "center_stroke"),
+            ActiveGuideId = ReadString(root, "active_guide_id", string.Empty),
+            ActiveOutputId = ReadString(root, "active_output_id", string.Empty),
+            SelectedPointIndex = ReadInt(root, "selected_point_index", -1),
+            SelectionKind = ReadSelectionKind(ReadString(root, "selection_kind", "texture"))
+        };
+
+        document.Textures.Clear();
+        foreach (Variant textureVariant in textures)
+        {
+            Godot.Collections.Dictionary texture = textureVariant.AsGodotDictionary();
+            Godot.Collections.Dictionary preview = texture["preview"].AsGodotDictionary();
+            Godot.Collections.Dictionary domain = texture["domain"].AsGodotDictionary();
+            int previewWidth = ReadInt(preview, "width_px", defaultPreviewWidth);
+            int previewHeight = ReadInt(preview, "height_px", defaultPreviewHeight);
+            float domainWidthCm = ReadFloat(domain, "width_cm", TextureGeneratorUnits.DefaultDomainSizeCm);
+            float domainHeightCm = ReadFloat(domain, "height_cm", TextureGeneratorUnits.DefaultDomainSizeCm);
+            TextureGeneratorItem item = new()
+            {
+                Id = texture["id"].AsString(),
+                Name = texture["name"].AsString(),
+                OriginMode = ReadOriginMode(ReadString(texture, "origin", "bottom_left")),
+                DomainWidthCm = domainWidthCm,
+                DomainHeightCm = domainHeightCm,
+                PreviewWidthPx = previewWidth,
+                PreviewHeightPx = previewHeight,
+                Visible = texture["visible"].AsBool()
+            };
+
+            item.Elements.Clear();
+            foreach (Variant elementVariant in texture["elements"].AsGodotArray())
+            {
+                item.Elements.Add(ReadElement(elementVariant.AsGodotDictionary()));
+            }
+
+            if (texture.ContainsKey("guides") && texture["guides"].VariantType == Variant.Type.Array)
+            {
+                foreach (Variant guideVariant in texture["guides"].AsGodotArray())
+                {
+                    item.Guides.Add(ReadGuide(guideVariant.AsGodotDictionary()));
+                }
+            }
+
+            foreach (Variant outputVariant in texture["outputs"].AsGodotArray())
+            {
+                item.Outputs.Add(ReadOutput(outputVariant.AsGodotDictionary()));
+            }
+
+            document.Textures.Add(item);
+        }
+
+        document.EnsureSelection();
+        return document;
+    }
+
+    private static TextureGeneratorElement ReadElement(Godot.Collections.Dictionary element)
+    {
+        string type = element["type"].AsString();
+        if (type.Equals(CenterStrokeElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadCenterStroke(element, supportsBezierHandles: false);
+        }
+
+        if (type.Equals(RectangleRegionElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadRectangleRegion(element);
+        }
+
+        if (type.Equals(EllipseRegionElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadEllipseRegion(element);
+        }
+
+        if (type.Equals(CenterPathElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadCenterStroke(element, CenterPathElement.ElementType);
+        }
+
+        if (type.Equals(CrackLineElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadCenterStroke(element, CrackLineElement.ElementType);
+        }
+
+        if (type.Equals(SweepGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadSweep(element);
+        }
+
+        if (type.Equals(RepeatGridGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadRepeatGrid(element);
+        }
+
+        if (type.Equals(BranchGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadBranch(element);
+        }
+
+        if (type.Equals(ScatterGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadScatter(element);
+        }
+
+        if (type.Equals(InvertFilterElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadInvert(element);
+        }
+
+        if (type.Equals(EdgeFalloffFilterElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadEdgeFalloff(element);
+        }
+
+        if (type.Equals(MirrorGeneratorElement.ElementType, System.StringComparison.Ordinal))
+        {
+            return ReadMirror(element);
+        }
+
+        return new CenterStrokeElement
+        {
+            Id = ReadString(element, "id", "center_stroke01")
+        };
+    }
+
+    private static InvertFilterElement ReadInvert(Godot.Collections.Dictionary invert)
+    {
+        return new InvertFilterElement
+        {
+            Id = ReadString(invert, "id", "invert"),
+            Name = ReadString(invert, "name", "Invert"),
+            Enabled = ReadBool(invert, "enabled", true),
+            Opacity = ReadFloat(invert, "opacity", 0.86f),
+            SourceElementId = ReadString(invert, "source_element_id", string.Empty)
+        };
+    }
+
+    private static EdgeFalloffFilterElement ReadEdgeFalloff(Godot.Collections.Dictionary falloff)
+    {
+        return new EdgeFalloffFilterElement
+        {
+            Id = ReadString(falloff, "id", "edge_falloff"),
+            Name = ReadString(falloff, "name", "Edge Falloff"),
+            Enabled = ReadBool(falloff, "enabled", true),
+            Opacity = ReadFloat(falloff, "opacity", 0.86f),
+            SourceElementId = ReadString(falloff, "source_element_id", string.Empty),
+            RadiusCm = ReadFloat(falloff, "radius_cm", 3.0f),
+            Exponent = ReadFloat(falloff, "exponent", 1.0f)
+        };
+    }
+
+    private static RepeatGridGeneratorElement ReadRepeatGrid(Godot.Collections.Dictionary repeat)
+    {
+        return new RepeatGridGeneratorElement
+        {
+            Id = ReadString(repeat, "id", "repeat_grid"),
+            Name = ReadString(repeat, "name", "Repeat Grid"),
+            Enabled = ReadBool(repeat, "enabled", true),
+            Opacity = ReadFloat(repeat, "opacity", 0.86f),
+            SourceElementId = ReadString(repeat, "source_element_id", string.Empty),
+            Columns = ReadInt(repeat, "columns", 1),
+            Rows = ReadInt(repeat, "rows", 1),
+            StepXCm = ReadFloat(repeat, "step_x_cm", 1.0f),
+            StepYCm = ReadFloat(repeat, "step_y_cm", 1.0f),
+            AlternateRowOffsetXCm = ReadFloat(repeat, "alternate_row_offset_x_cm", 0.0f)
+        };
+    }
+
+    private static BranchGeneratorElement ReadBranch(Godot.Collections.Dictionary branch)
+    {
+        return new BranchGeneratorElement
+        {
+            Id = ReadString(branch, "id", "branch"),
+            Name = ReadString(branch, "name", "Branch"),
+            Enabled = ReadBool(branch, "enabled", true),
+            Opacity = ReadFloat(branch, "opacity", 0.86f),
+            SourceElementId = ReadString(branch, "source_element_id", string.Empty),
+            Seed = ReadInt(branch, "seed", 1),
+            Count = ReadInt(branch, "count", 10),
+            Segments = ReadInt(branch, "segments", 3),
+            Depth = ReadInt(branch, "depth", 1),
+            ChildrenPerBranch = ReadInt(branch, "children_per_branch", 2),
+            StartT = ReadFloat(branch, "start_t", 0.08f),
+            EndT = ReadFloat(branch, "end_t", 0.92f),
+            LengthMinCm = ReadFloat(branch, "length_min_cm", 18.0f),
+            LengthMaxCm = ReadFloat(branch, "length_max_cm", 55.0f),
+            AngleMinDegrees = ReadFloat(branch, "angle_min_degrees", 25.0f),
+            AngleMaxDegrees = ReadFloat(branch, "angle_max_degrees", 65.0f),
+            WidthScale = ReadFloat(branch, "width_scale", 0.45f),
+            Irregularity = ReadFloat(branch, "irregularity", 0.25f),
+            DepthLengthScale = ReadFloat(branch, "depth_length_scale", 0.55f),
+            RenderSource = ReadBool(branch, "render_source", true)
+        };
+    }
+
+    private static ScatterGeneratorElement ReadScatter(Godot.Collections.Dictionary scatter)
+    {
+        return new ScatterGeneratorElement
+        {
+            Id = ReadString(scatter, "id", "scatter"),
+            Name = ReadString(scatter, "name", "Scatter"),
+            Enabled = ReadBool(scatter, "enabled", true),
+            Opacity = ReadFloat(scatter, "opacity", 0.86f),
+            SourceElementId = ReadString(scatter, "source_element_id", string.Empty),
+            BoundsElementId = ReadString(scatter, "bounds_element_id", string.Empty),
+            Seed = ReadInt(scatter, "seed", 1),
+            Count = ReadInt(scatter, "count", 64),
+            ClusterCount = ReadInt(scatter, "cluster_count", 6),
+            ClusterStrength = ReadFloat(scatter, "cluster_strength", 0.8f),
+            ClusterRadiusCm = ReadFloat(scatter, "cluster_radius_cm", 48.0f),
+            ScaleMin = ReadFloat(scatter, "scale_min", 0.35f),
+            ScaleMax = ReadFloat(scatter, "scale_max", 1.4f),
+            RotationMinDegrees = ReadFloat(scatter, "rotation_min_degrees", -180.0f),
+            RotationMaxDegrees = ReadFloat(scatter, "rotation_max_degrees", 180.0f),
+            RenderSource = ReadBool(scatter, "render_source", false)
+        };
+    }
+
+    private static RectangleRegionElement ReadRectangleRegion(Godot.Collections.Dictionary region)
+    {
+        return new RectangleRegionElement
+        {
+            Id = ReadString(region, "id", "rectangle_region"),
+            Name = ReadString(region, "name", "Rectangle Region"),
+            Enabled = ReadBool(region, "enabled", true),
+            Opacity = ReadFloat(region, "opacity", 0.86f),
+            Position = ReadVector2(region, "position"),
+            RotationDegrees = ReadFloat(region, "rotation_degrees", 0.0f),
+            WidthCm = ReadFloat(region, "width_cm", 80.0f),
+            HeightCm = ReadFloat(region, "height_cm", 40.0f),
+            CornerRadiusCm = ReadFloat(region, "corner_radius_cm", 0.0f)
+        };
+    }
+
+    private static EllipseRegionElement ReadEllipseRegion(Godot.Collections.Dictionary region)
+    {
+        return new EllipseRegionElement
+        {
+            Id = ReadString(region, "id", "ellipse_region"),
+            Name = ReadString(region, "name", "Ellipse Region"),
+            Enabled = ReadBool(region, "enabled", true),
+            Opacity = ReadFloat(region, "opacity", 0.86f),
+            Position = ReadVector2(region, "position"),
+            RotationDegrees = ReadFloat(region, "rotation_degrees", 0.0f),
+            WidthCm = ReadFloat(region, "width_cm", 24.0f),
+            HeightCm = ReadFloat(region, "height_cm", 24.0f)
+        };
+    }
+
+    private static SweepGeneratorElement ReadSweep(Godot.Collections.Dictionary sweep)
+    {
+        return new SweepGeneratorElement
+        {
+            Id = ReadString(sweep, "id", "sweep01"),
+            Name = ReadString(sweep, "name", ReadString(sweep, "id", "Sweep")),
+            Enabled = ReadBool(sweep, "enabled", true),
+            Opacity = ReadFloat(sweep, "opacity", 0.86f),
+            SourceElementId = ReadString(sweep, "source_element_id", string.Empty),
+            TargetElementId = ReadString(sweep, "target_element_id", string.Empty),
+            Count = ReadInt(sweep, "count", 8),
+            StartT = ReadFloat(sweep, "start_t", 0.0f),
+            EndT = ReadFloat(sweep, "end_t", 1.0f),
+            Alignment = ReadSweepAlignment(ReadString(sweep, "alignment", "normal")),
+            SideMode = ReadSweepSideMode(ReadString(sweep, "side_mode", "right")),
+            RotationOffsetDegrees = ReadFloat(sweep, "rotation_offset_degrees", 0.0f),
+            LengthScaleStart = ReadFloat(sweep, "length_scale_start", 1.0f),
+            LengthScaleEnd = ReadFloat(sweep, "length_scale_end", 0.1f),
+            WidthScaleStart = ReadFloat(sweep, "width_scale_start", 1.0f),
+            WidthScaleEnd = ReadFloat(sweep, "width_scale_end", 0.1f),
+            RenderSource = ReadBool(sweep, "render_source", false)
+        };
+    }
+
+    private static MirrorGeneratorElement ReadMirror(Godot.Collections.Dictionary mirror)
+    {
+        return new MirrorGeneratorElement
+        {
+            Id = ReadString(mirror, "id", "mirror01"),
+            Name = ReadString(mirror, "name", ReadString(mirror, "id", "Mirror")),
+            Enabled = ReadBool(mirror, "enabled", true),
+            Opacity = ReadFloat(mirror, "opacity", 0.86f),
+            SourceElementId = ReadString(mirror, "source_element_id", string.Empty),
+            AxisGuideId = ReadString(mirror, "axis_guide_id", string.Empty),
+            RenderSource = ReadBool(mirror, "render_source", false)
+        };
+    }
+
+    private static TextureGeneratorGuide ReadGuide(Godot.Collections.Dictionary guide)
+    {
+        return new TextureGeneratorGuide
+        {
+            Id = ReadString(guide, "id", "guide01"),
+            Name = ReadString(guide, "name", ReadString(guide, "id", "Guide")),
+            Type = ReadGuideType(ReadString(guide, "type", "point")),
+            Position = ReadVector2(guide, "position"),
+            AxisEnd = ReadVector2(guide, "axis_end")
+        };
+    }
+
+    private static TextureGeneratorOutputBinding ReadOutput(Godot.Collections.Dictionary output)
+    {
+        TextureGeneratorOutputBinding binding = new()
+        {
+            Id = ReadString(output, "id", "output"),
+            Name = ReadString(output, "name", "Output"),
+            Kind = ReadOutputKind(ReadString(output, "kind", "mask")),
+            Enabled = ReadBool(output, "enabled", true),
+            Value = ReadFloat(output, "value", 1.0f),
+            HeightAmplitudeCm = ReadFloat(output, "height_amplitude_cm", 1.0f)
+        };
+        foreach (Variant sourceVariant in output["source_element_ids"].AsGodotArray())
+        {
+            binding.SourceElementIds.Add(sourceVariant.AsString());
+        }
+        return binding;
+    }
+
+    private static CenterStrokeElement ReadCenterStroke(Godot.Collections.Dictionary centerStroke, bool supportsBezierHandles)
+    {
+        return ReadCenterStroke(centerStroke, supportsBezierHandles ? CenterPathElement.ElementType : CenterStrokeElement.ElementType);
+    }
+
+    private static CenterStrokeElement ReadCenterStroke(Godot.Collections.Dictionary centerStroke, string elementType)
+    {
+        bool supportsBezierHandles = !elementType.Equals(CenterStrokeElement.ElementType, System.StringComparison.Ordinal);
+        CenterStrokeElement element = elementType.Equals(CrackLineElement.ElementType, System.StringComparison.Ordinal) ? new CrackLineElement
+        {
+            Id = ReadString(centerStroke, "id", "crack_line"),
+            Name = ReadString(centerStroke, "name", ReadString(centerStroke, "id", "Crack Line")),
+            Enabled = centerStroke["enabled"].AsBool(),
+            Opacity = centerStroke["opacity"].AsSingle(),
+            Symmetry = centerStroke["symmetry"].AsBool(),
+            Falloff = centerStroke["falloff"].AsSingle()
+        } : supportsBezierHandles ? new CenterPathElement
+        {
+            Id = ReadString(centerStroke, "id", "center_stroke"),
+            Name = ReadString(centerStroke, "name", ReadString(centerStroke, "id", "Center Path")),
+            Enabled = centerStroke["enabled"].AsBool(),
+            Opacity = centerStroke["opacity"].AsSingle(),
+            Symmetry = centerStroke["symmetry"].AsBool(),
+            Falloff = centerStroke["falloff"].AsSingle()
+        } : new CenterStrokeElement
+        {
+            Id = ReadString(centerStroke, "id", "center_stroke"),
+            Name = ReadString(centerStroke, "name", ReadString(centerStroke, "id", "Center Stroke")),
+            Enabled = centerStroke["enabled"].AsBool(),
+            Opacity = centerStroke["opacity"].AsSingle(),
+            Symmetry = centerStroke["symmetry"].AsBool(),
+            Falloff = centerStroke["falloff"].AsSingle()
+        };
+
+        Godot.Collections.Array points = centerStroke["points"].AsGodotArray();
+        foreach (Variant pointVariant in points)
+        {
+            Godot.Collections.Dictionary point = pointVariant.AsGodotDictionary();
+            element.Points.Add(new CenterStrokePoint
+            {
+                X = point["x"].AsSingle(),
+                Y = point["y"].AsSingle(),
+                LeftWidth = point["left_width"].AsSingle(),
+                RightWidth = point["right_width"].AsSingle(),
+                HandleMode = supportsBezierHandles ? ReadPathHandleMode(ReadString(point, "handle_mode", "aligned")) : TextureGeneratorHandleMode.Linear,
+                InHandle = supportsBezierHandles ? ReadVector2(point, "in_handle") : Vector2.Zero,
+                OutHandle = supportsBezierHandles ? ReadVector2(point, "out_handle") : Vector2.Zero
+            });
+        }
+
+        Godot.Collections.Dictionary transform = centerStroke["transform"].AsGodotDictionary();
+        element.Transform.Position = ReadVector2(transform, "position");
+        element.Transform.RotationDegrees = ReadFloat(transform, "rotation_degrees", 0.0f);
+        element.Transform.LengthScale = ReadFloat(transform, "length_scale", 1.0f);
+        element.Transform.WidthScale = ReadFloat(transform, "width_scale", 1.0f);
+
+        element.NormalizeLocalAxes();
+
+        return element;
+    }
+
+    private static string ReadString(Godot.Collections.Dictionary dictionary, string key, string fallback)
+    {
+        return dictionary.ContainsKey(key) && dictionary[key].VariantType == Variant.Type.String ? dictionary[key].AsString() : fallback;
+    }
+
+    private static int ReadInt(Godot.Collections.Dictionary dictionary, string key, int fallback)
+    {
+        return dictionary.ContainsKey(key)
+            && (dictionary[key].VariantType == Variant.Type.Int || dictionary[key].VariantType == Variant.Type.Float)
+            ? dictionary[key].AsInt32()
+            : fallback;
+    }
+
+    private static bool ReadBool(Godot.Collections.Dictionary dictionary, string key, bool fallback)
+    {
+        return dictionary.ContainsKey(key) && dictionary[key].VariantType == Variant.Type.Bool ? dictionary[key].AsBool() : fallback;
+    }
+
+    private static float ReadFloat(Godot.Collections.Dictionary dictionary, string key, float fallback)
+    {
+        return dictionary.ContainsKey(key) && (dictionary[key].VariantType == Variant.Type.Float || dictionary[key].VariantType == Variant.Type.Int)
+            ? dictionary[key].AsSingle()
+            : fallback;
+    }
+
+    private static Vector2 ReadVector2(Godot.Collections.Dictionary dictionary, string key)
+    {
+        if (!dictionary.ContainsKey(key) || dictionary[key].VariantType != Variant.Type.Dictionary)
+        {
+            return Vector2.Zero;
+        }
+
+        Godot.Collections.Dictionary vector = dictionary[key].AsGodotDictionary();
+        return new Vector2(ReadFloat(vector, "x", 0.0f), ReadFloat(vector, "y", 0.0f));
+    }
+
+    private static TextureGeneratorHandleMode ReadHandleMode(string value)
+    {
+        return value switch
+        {
+            "linear" => TextureGeneratorHandleMode.Linear,
+            "free" => TextureGeneratorHandleMode.Free,
+            "aligned" => TextureGeneratorHandleMode.Aligned,
+            "mirrored" => TextureGeneratorHandleMode.Mirrored,
+            _ => TextureGeneratorHandleMode.Linear
+        };
+    }
+
+    private static TextureGeneratorHandleMode ReadPathHandleMode(string value)
+    {
+        TextureGeneratorHandleMode mode = ReadHandleMode(value);
+        return mode == TextureGeneratorHandleMode.Linear ? TextureGeneratorHandleMode.Aligned : mode;
+    }
+
+    private static string HandleModeToJson(TextureGeneratorHandleMode mode)
+    {
+        return mode switch
+        {
+            TextureGeneratorHandleMode.Linear => "linear",
+            TextureGeneratorHandleMode.Free => "free",
+            TextureGeneratorHandleMode.Aligned => "aligned",
+            TextureGeneratorHandleMode.Mirrored => "mirrored",
+            _ => "free"
+        };
+    }
+
+    private static TextureGeneratorSweepAlignment ReadSweepAlignment(string value)
+    {
+        return value == "tangent" ? TextureGeneratorSweepAlignment.Tangent : TextureGeneratorSweepAlignment.Normal;
+    }
+
+    private static string SweepAlignmentToJson(TextureGeneratorSweepAlignment alignment)
+    {
+        return alignment == TextureGeneratorSweepAlignment.Tangent ? "tangent" : "normal";
+    }
+
+    private static TextureGeneratorSweepSideMode ReadSweepSideMode(string value)
+    {
+        return value switch
+        {
+            "right" => TextureGeneratorSweepSideMode.Right,
+            "both" => TextureGeneratorSweepSideMode.Both,
+            _ => TextureGeneratorSweepSideMode.Left
+        };
+    }
+
+    private static string SweepSideModeToJson(TextureGeneratorSweepSideMode sideMode)
+    {
+        return sideMode switch
+        {
+            TextureGeneratorSweepSideMode.Right => "right",
+            TextureGeneratorSweepSideMode.Both => "both",
+            _ => "left"
+        };
+    }
+
+    private static TextureGeneratorGuideType ReadGuideType(string value)
+    {
+        return value == "axis" ? TextureGeneratorGuideType.Axis : TextureGeneratorGuideType.Point;
+    }
+
+    private static TextureGeneratorOutputKind ReadOutputKind(string value)
+    {
+        return value == "height" ? TextureGeneratorOutputKind.Height : TextureGeneratorOutputKind.Mask;
+    }
+
+    private static string OutputKindToJson(TextureGeneratorOutputKind kind)
+    {
+        return kind == TextureGeneratorOutputKind.Height ? "height" : "mask";
+    }
+
+    private static string GuideTypeToJson(TextureGeneratorGuideType type)
+    {
+        return type == TextureGeneratorGuideType.Axis ? "axis" : "point";
+    }
+
+    private static TextureGeneratorSelectionKind ReadSelectionKind(string value)
+    {
+        return value switch
+        {
+            "element" => TextureGeneratorSelectionKind.Element,
+            "point" => TextureGeneratorSelectionKind.Point,
+            "guide" => TextureGeneratorSelectionKind.Guide,
+            "output" => TextureGeneratorSelectionKind.Output,
+            _ => TextureGeneratorSelectionKind.Texture
+        };
+    }
+
+    private static TextureGeneratorOriginMode ReadOriginMode(string value)
+    {
+        return value switch
+        {
+            "bottom_center" => TextureGeneratorOriginMode.BottomCenter,
+            "center" => TextureGeneratorOriginMode.Center,
+            _ => TextureGeneratorOriginMode.BottomLeft
+        };
+    }
+
+    private static string OriginModeToJson(TextureGeneratorOriginMode originMode)
+    {
+        return originMode switch
+        {
+            TextureGeneratorOriginMode.BottomCenter => "bottom_center",
+            TextureGeneratorOriginMode.Center => "center",
+            _ => "bottom_left"
+        };
+    }
+
+    private static string Number(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private static string JsonBool(bool value)
+    {
+        return value ? "true" : "false";
+    }
+
+    private static string EscapeJson(string value)
+    {
+        return (value ?? string.Empty)
+            .Replace("\\", "\\\\", System.StringComparison.Ordinal)
+            .Replace("\"", "\\\"", System.StringComparison.Ordinal);
+    }
+
+    private static string GetPathDirectory(string path)
+    {
+        int slashIndex = path.LastIndexOf('/');
+        return slashIndex < 0 ? string.Empty : path[..slashIndex];
+    }
+
+    private static void EnsureDirectory(string path)
+    {
+        if (!string.IsNullOrEmpty(path))
+        {
+            DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(path));
+        }
+    }
+}

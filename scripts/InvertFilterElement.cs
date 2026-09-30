@@ -1,4 +1,4 @@
-public sealed class InvertFilterElement : PolyTextureElement
+public sealed class InvertFilterElement : TextureGeneratorElement
 {
     public const string ElementType = "invert";
 
@@ -6,7 +6,7 @@ public sealed class InvertFilterElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new InvertFilterElement
         {

@@ -1,4 +1,4 @@
-public sealed class EdgeFalloffFilterElement : PolyTextureElement
+public sealed class EdgeFalloffFilterElement : TextureGeneratorElement
 {
     public const string ElementType = "edge_falloff";
 
@@ -8,7 +8,7 @@ public sealed class EdgeFalloffFilterElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new EdgeFalloffFilterElement
         {

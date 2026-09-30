@@ -1,4 +1,4 @@
-public sealed class MirrorGeneratorElement : PolyTextureElement
+public sealed class MirrorGeneratorElement : TextureGeneratorElement
 {
     public const string ElementType = "mirror";
 
@@ -8,7 +8,7 @@ public sealed class MirrorGeneratorElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new MirrorGeneratorElement
         {

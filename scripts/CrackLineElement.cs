@@ -5,7 +5,7 @@ public sealed class CrackLineElement : CenterStrokeElement
     public override bool SupportsBezierHandles => true;
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         CrackLineElement clone = new()
         {

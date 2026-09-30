@@ -1,6 +1,6 @@
 using Godot;
 
-public sealed class EllipseRegionElement : PolyTextureElement
+public sealed class EllipseRegionElement : TextureGeneratorElement
 {
     public const string ElementType = "ellipse_region";
 
@@ -11,7 +11,7 @@ public sealed class EllipseRegionElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new EllipseRegionElement
         {

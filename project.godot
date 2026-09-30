@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="PolyTexture"
-run/main_scene="res://scenes/PolyTextureWorkspace.tscn"
+config/name="TextureGenerator"
+run/main_scene="res://scenes/TextureGeneratorWorkspace.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -21,4 +21,4 @@ window/size/mode=2
 
 [dotnet]
 
-project/assembly_name="PolyTexture"
+project/assembly_name="TextureGenerator"

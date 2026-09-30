@@ -1,4 +1,4 @@
-public sealed class SweepGeneratorElement : PolyTextureElement
+public sealed class SweepGeneratorElement : TextureGeneratorElement
 {
     public const string ElementType = "sweep";
 
@@ -7,8 +7,8 @@ public sealed class SweepGeneratorElement : PolyTextureElement
     public int Count { get; set; } = 8;
     public float StartT { get; set; }
     public float EndT { get; set; } = 1.0f;
-    public PolyTextureSweepAlignment Alignment { get; set; } = PolyTextureSweepAlignment.Normal;
-    public PolyTextureSweepSideMode SideMode { get; set; } = PolyTextureSweepSideMode.Right;
+    public TextureGeneratorSweepAlignment Alignment { get; set; } = TextureGeneratorSweepAlignment.Normal;
+    public TextureGeneratorSweepSideMode SideMode { get; set; } = TextureGeneratorSweepSideMode.Right;
     public float RotationOffsetDegrees { get; set; }
     public float LengthScaleStart { get; set; } = 1.0f;
     public float LengthScaleEnd { get; set; } = 0.1f;
@@ -18,7 +18,7 @@ public sealed class SweepGeneratorElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new SweepGeneratorElement
         {

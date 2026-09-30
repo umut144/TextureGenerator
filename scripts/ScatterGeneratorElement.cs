@@ -1,4 +1,4 @@
-public sealed class ScatterGeneratorElement : PolyTextureElement
+public sealed class ScatterGeneratorElement : TextureGeneratorElement
 {
     public const string ElementType = "scatter";
 
@@ -17,7 +17,7 @@ public sealed class ScatterGeneratorElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new ScatterGeneratorElement
         {

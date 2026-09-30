@@ -1,4 +1,4 @@
-public sealed class BranchGeneratorElement : PolyTextureElement
+public sealed class BranchGeneratorElement : TextureGeneratorElement
 {
     public const string ElementType = "branch";
 
@@ -21,7 +21,7 @@ public sealed class BranchGeneratorElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new BranchGeneratorElement
         {

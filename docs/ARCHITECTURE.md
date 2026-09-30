@@ -1,6 +1,6 @@
-# PolyTexture Architecture
+# TextureGenerator Architecture
 
-PolyTexture is a vector-first procedural surface authoring tool. Its canonical
+TextureGenerator is a vector-first procedural surface authoring tool. Its canonical
 documents describe resolution-independent sources and deterministic operations.
 Shaders and raster images are evaluation targets, not authoring sources of
 truth.
@@ -95,7 +95,7 @@ the fractal growth bounded; validation caps a graph at 4096 derived branches.
 
 ## Tool abstraction levels
 
-PolyTexture intentionally supports tools at multiple abstraction levels:
+TextureGenerator intentionally supports tools at multiple abstraction levels:
 
 - low-level Sources, Generators, Operators, and Filters expose deterministic
   construction parameters for technical artists and recipe authors;

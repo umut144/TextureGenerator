@@ -1,4 +1,4 @@
-public sealed class RepeatGridGeneratorElement : PolyTextureElement
+public sealed class RepeatGridGeneratorElement : TextureGeneratorElement
 {
     public const string ElementType = "repeat_grid";
 
@@ -11,7 +11,7 @@ public sealed class RepeatGridGeneratorElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new RepeatGridGeneratorElement
         {

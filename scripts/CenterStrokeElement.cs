@@ -1,19 +1,19 @@
 using System.Collections.Generic;
 using Godot;
 
-public class CenterStrokeElement : PolyTextureElement
+public class CenterStrokeElement : TextureGeneratorElement
 {
     public const string ElementType = "center_stroke";
 
     public bool Symmetry { get; set; } = true;
     public float Falloff { get; set; }
-    public PolyTextureElementTransform Transform { get; set; } = new();
+    public TextureGeneratorElementTransform Transform { get; set; } = new();
     public List<CenterStrokePoint> Points { get; } = new();
 
     public virtual bool SupportsBezierHandles => false;
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         CenterStrokeElement clone = new()
         {

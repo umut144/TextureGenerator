@@ -1,6 +1,6 @@
 using Godot;
 
-public sealed class RectangleRegionElement : PolyTextureElement
+public sealed class RectangleRegionElement : TextureGeneratorElement
 {
     public const string ElementType = "rectangle_region";
 
@@ -12,7 +12,7 @@ public sealed class RectangleRegionElement : PolyTextureElement
 
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         return new RectangleRegionElement
         {

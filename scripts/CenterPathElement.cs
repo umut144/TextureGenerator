@@ -5,7 +5,7 @@ public sealed class CenterPathElement : CenterStrokeElement
     public override bool SupportsBezierHandles => true;
     public override string Type => ElementType;
 
-    public override PolyTextureElement Clone()
+    public override TextureGeneratorElement Clone()
     {
         CenterPathElement clone = new()
         {
