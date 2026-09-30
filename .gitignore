@@ -7,3 +7,5 @@ obj/
 !/output/.gdignore
 /savefiles/*
 !/savefiles/.gdignore
+AGENTS.md
+CLAUDE.md
